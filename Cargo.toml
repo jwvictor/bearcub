@@ -1,0 +1,11 @@
+[package]
+name = "bearcub"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "^1.0.42"
+bytes = "1"
+tokio = { version = "1.25.0", features = ["full"] }
