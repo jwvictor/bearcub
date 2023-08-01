@@ -8,6 +8,10 @@ pub mod server {
     pub mod sharding;
 }
 
+pub mod storage {
+    pub mod format;
+}
+
 pub fn say_hello() {
     println!("Hello, world!");
 }
