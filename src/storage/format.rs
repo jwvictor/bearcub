@@ -1,6 +1,7 @@
 
 use serde::{Serialize, Deserialize};
 use anyhow::*;
+use std::fs;
 use std::fs::File;
 use std::io::prelude::*;
 use bson::*;
@@ -29,6 +30,10 @@ impl BlobNode {
         file.write_all(&bs[..])?;
         Ok(())
     }
+
+    pub fn eq(&self, other: BlobNode) -> bool {
+        self.id.eq(&other.id) && self.children.len() == other.children.len()
+    }
 }
 
 
@@ -38,7 +43,6 @@ mod tests {
 
     #[test]
     fn test_node_flush() {
-
         const ID0: &str = "0";
         const ROOT: &str = "root";
         const ID1: &str = "1";
@@ -50,5 +54,8 @@ mod tests {
         let bc0 = BlobNode::new(ID0.to_string(), ROOT.to_string(), vec![bc1, bc2]);
         let res = bc0.flush_to_file("testfile.bson");
         assert_eq!(res.is_ok(), true);
+        let input_file = fs::read("testfile.bson").unwrap();
+        let deserialized: BlobNode = bson::from_slice_utf8_lossy(&input_file).unwrap();
+        assert_eq!(deserialized.eq(bc0), true)
     }
 }
