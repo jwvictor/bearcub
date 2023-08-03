@@ -35,8 +35,16 @@ impl BlobNode {
 
     }
 
-    pub fn children(&self) -> &[BlobNode] {
-        &self.children[..]
+    pub fn children(&self) -> Vec<&BlobNode> {
+        let mut v = vec![];
+        for c in &self.children {
+            v.push(c);
+        }
+        v
+    }
+
+    pub fn add_child(&mut self, child: BlobNode) {
+        self.children.push(child);
     }
 
     pub fn flush_to_file(&self, path: &str) -> Result<()> {

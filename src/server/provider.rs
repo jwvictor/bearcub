@@ -1,6 +1,7 @@
 use crate::storage::format::BlobNode;
-
-
+use std::path::Path;
+use std::fs::create_dir_all;
+use anyhow::*;
 
 pub struct Provider {
     data_dir: String,
@@ -13,8 +14,14 @@ impl Provider {
         Provider { data_dir, user_id, blob_root: None }
     }
 
+    fn user_data_path(&self) -> String {
+        let filename = format!("{}/{}", &self.data_dir, &self.user_id);
+        filename
+
+    }
+
     fn skeleton_filename(&self) -> String {
-        let filename = format!("{}/{}/blobs.bson", &self.data_dir, &self.user_id);
+        let filename = format!("{}/blobs.bson", self.user_data_path());
         filename
 
     }
@@ -28,22 +35,70 @@ impl Provider {
         self.blob_root = BlobNode::from_file(&filename[..]).ok();
     }
 
+    pub fn check_storage_ready(&self) -> anyhow::Result<()> {
+        let path = self.user_data_path();
+        if !Path::new(&path[..]).exists() {
+            let _ = create_dir_all(path)?;
+            Ok(())
+        }
+        else {
+            Ok(())
+        }
+    }
+
+    pub fn flush(&mut self) -> Result<()> {
+        self.check_root_structure();
+        self.check_storage_ready()?;
+        match &self.blob_root {
+            Some(root) => root.flush_to_file(&self.skeleton_filename()[..]),
+            None => Ok(()),
+        }
+    }
+
+    pub fn put_blob(&mut self, id: &str, title: &str, parent_id: Option<&str>) -> Result<()> {
+        match parent_id {
+            None => {
+                match &mut self.blob_root {
+                    Some(root) => {
+                        root.add_child(BlobNode::new(id.to_string(), title.to_string(), vec![]));
+                        Ok(())
+                    },
+                    None => Ok(())
+                }
+            },
+            Some(pid) => {
+                match &mut self.blob_root {
+                    Some(root) => {
+                        // let mut parent: &mut BlobNode = by_id_for_node(&root, pid).unwrap();
+                        // parent.add_child(BlobNode::new(id.to_string(), title.to_string(), vec![]));
+                        Ok(())
+
+                    },
+                    None => Err(anyhow!("No skeleton loaded")),
+                }
+            }
+        }
+    }
+
     pub fn get_blob(&self, id: &str) -> Option<BlobNode> {
         match &self.blob_root {
             Some(root) => {
-                //
                 let res = by_id_for_node(root, id);
-                res
+                if res.is_some() {
+                    Some(res.unwrap().clone())
+                } else {
+                    None
+                }
             },
             None => None,
         }
     }
 }
 
-fn by_id_for_node(node: &BlobNode, id: &str) -> Option<BlobNode> {
+fn by_id_for_node<'a>(node: &'a BlobNode, id: &str) -> Option<&'a BlobNode> {
     if node.id().eq(id) {
-        let rig = node.clone();
-        Some(rig)
+        // let rig = node.clone();
+        Some(node)
     } else {
         let c = node.children();
         for x in c {
