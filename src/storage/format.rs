@@ -11,7 +11,7 @@ use bson::*;
 
 
 // The root blob node owns all child blobs.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BlobNode {
   id: String,
   title: String,
@@ -21,6 +21,18 @@ pub struct BlobNode {
 impl BlobNode {
     pub fn new(id: String, title: String, children: Vec<BlobNode>) -> BlobNode {
         return BlobNode{id, title, children};
+    }
+
+    pub fn id(&self) -> String {
+        self.id.clone()
+    }
+
+    pub fn from_file(path: &str) -> Result<BlobNode> {
+        // let fpath = path.to_string();
+        let fp = fs::read(path)?;
+        let deser: BlobNode = bson::from_slice(&fp[..])?;
+        Ok(deser)
+
     }
 
     pub fn flush_to_file(&self, path: &str) -> Result<()> {

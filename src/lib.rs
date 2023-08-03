@@ -6,6 +6,7 @@ pub mod protocol {
 pub mod server {
     pub mod connection;
     pub mod sharding;
+    pub mod provider;
 }
 
 pub mod storage {
