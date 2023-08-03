@@ -22,12 +22,32 @@ impl Provider {
     }
 
     pub fn get_blob(&self, id: &str) -> Option<BlobNode> {
-        None
+        match &self.blob_root {
+            Some(root) => {
+                //
+                let res = by_id_for_node(root, id);
+                res
+            },
+            None => None,
+        }
     }
 
 }
 
-fn by_id_for_node(node: BlobNode, id: &str) -> Option<BlobNode> {
-    None
+fn by_id_for_node(node: &BlobNode, id: &str) -> Option<BlobNode> {
+    if node.id().eq(id) {
+        let rig = node.clone();
+        Some(rig)
+    } else {
+        let c = node.children();
+        for x in c {
+            let rv = by_id_for_node(x, id);
+            if rv.is_some() {
+                // return Some(rv.unwrap().clone())
+                return rv;
+            }
+        }
+        return None;
+    }
 }
 

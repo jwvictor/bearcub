@@ -23,8 +23,8 @@ impl BlobNode {
         return BlobNode{id, title, children};
     }
 
-    pub fn id(&self) -> String {
-        self.id.clone()
+    pub fn id(&self) -> &str {
+        &self.id[..]
     }
 
     pub fn from_file(path: &str) -> Result<BlobNode> {
@@ -33,6 +33,10 @@ impl BlobNode {
         let deser: BlobNode = bson::from_slice(&fp[..])?;
         Ok(deser)
 
+    }
+
+    pub fn children(&self) -> &[BlobNode] {
+        &self.children[..]
     }
 
     pub fn flush_to_file(&self, path: &str) -> Result<()> {
