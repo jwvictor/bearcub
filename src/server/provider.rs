@@ -1,4 +1,4 @@
-use crate::storage::format::BlobNode;
+use crate::storage::format::*;
 use std::path::Path;
 use std::fs::create_dir_all;
 use anyhow::*;
@@ -6,7 +6,7 @@ use anyhow::*;
 pub struct Provider {
     data_dir: String,
     user_id: String,
-    blob_root: Option<BlobNode>,
+    blob_root: Option<BlobNodeRef>,
 }
 
 impl Provider {
@@ -80,10 +80,10 @@ impl Provider {
         }
     }
 
-    pub fn get_blob(&self, id: &str) -> Option<BlobNode> {
+    pub fn get_blob(&self, id: &str) -> Option<BlobNodeRef> {
         match &self.blob_root {
             Some(root) => {
-                let res = by_id_for_node(root, id);
+                let res = by_id_for_node(root.clone(), id);
                 if res.is_some() {
                     Some(res.unwrap().clone())
                 } else {
@@ -95,12 +95,14 @@ impl Provider {
     }
 }
 
-fn by_id_for_node<'a>(node: &'a BlobNode, id: &str) -> Option<&'a BlobNode> {
-    if node.id().eq(id) {
+
+fn by_id_for_node<'a>(node: BlobNodeRef, id: &str) -> Option<BlobNodeRef> {
+    let node_borrow = node.node();
+    if (*node_borrow.borrow()).id().eq(id) {
         // let rig = node.clone();
         Some(node)
     } else {
-        let c = node.children();
+        let c = (*node_borrow.borrow()).children();
         for x in c {
             let rv = by_id_for_node(x, id);
             if rv.is_some() {

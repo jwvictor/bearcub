@@ -1,13 +1,20 @@
 
 use serde::{Serialize, Deserialize};
 use anyhow::*;
+use std::cell::RefCell;
 use std::fs;
 use std::fs::File;
 use std::io::prelude::*;
+use std::rc::Rc;
 use bson::*;
 
 // Step 1: maintain a file with the hierarchy of blobs, to store in <user id>/blobs.bson
 // Step 2: maintain individual files for blobs at <user id>/<blob id>.json
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct BlobNodeRef {
+    node: Rc<RefCell<BlobNode>>,
+}
 
 
 // The root blob node owns all child blobs.
@@ -15,36 +22,37 @@ use bson::*;
 pub struct BlobNode {
   id: String,
   title: String,
-  children: Vec<BlobNode>,
+  children: Vec<BlobNodeRef>,
 }
 
 impl BlobNode {
     pub fn new(id: String, title: String, children: Vec<BlobNode>) -> BlobNode {
-        return BlobNode{id, title, children};
+        let children_refs:Vec<BlobNodeRef> = children.into_iter().map(|x| BlobNodeRef{node: Rc::new(RefCell::new(x))}).collect();
+        return BlobNode{id, title, children: children_refs};
     }
 
     pub fn id(&self) -> &str {
         &self.id[..]
     }
 
-    pub fn from_file(path: &str) -> Result<BlobNode> {
+    pub fn from_file(path: &str) -> Result<BlobNodeRef> {
         // let fpath = path.to_string();
         let fp = fs::read(path)?;
-        let deser: BlobNode = bson::from_slice(&fp[..])?;
+        let deser: BlobNodeRef = bson::from_slice(&fp[..])?;
         Ok(deser)
 
     }
 
-    pub fn children(&self) -> Vec<&BlobNode> {
+    pub fn children(&self) -> Vec<BlobNodeRef> {
         let mut v = vec![];
         for c in &self.children {
-            v.push(c);
+            v.push(c.clone());
         }
         v
     }
 
     pub fn add_child(&mut self, child: BlobNode) {
-        self.children.push(child);
+        self.children.push(BlobNodeRef{ node: Rc::new(RefCell::new(child))});
     }
 
     pub fn flush_to_file(&self, path: &str) -> Result<()> {
@@ -58,6 +66,30 @@ impl BlobNode {
     pub fn eq(&self, other: BlobNode) -> bool {
         self.id.eq(&other.id) && self.children.len() == other.children.len()
     }
+}
+
+impl BlobNodeRef {
+    pub fn from(node: BlobNode) -> BlobNodeRef {
+        BlobNodeRef{ node: Rc::new(RefCell::new(node))}
+    }
+
+    pub fn flush_to_file(&self, path: &str) -> Result<()> {
+        let x = (*self.node).borrow();
+        x.flush_to_file(path)
+    }
+   
+
+    // TODO - everything is going to explode due to the runtime borrow checking of these ref cells.
+    // need to enforce concurrent access in some sane-ish way
+    pub fn add_child(&self, child: BlobNode) {
+        let mut root = (*self.node).borrow_mut();
+        root.add_child(child)
+    }
+
+    pub fn node(&self) -> Rc<RefCell<BlobNode>> {
+        self.node.clone()
+    }
+
 }
 
 
