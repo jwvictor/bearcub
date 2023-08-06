@@ -2,6 +2,9 @@
 use serde::{Serialize, Deserialize};
 use anyhow::*;
 use std::cell::RefCell;
+use std::collections::HashMap;
+use std::sync::Mutex;
+use std::sync::Arc;
 use std::fs;
 use std::fs::File;
 use std::io::prelude::*;
@@ -11,17 +14,83 @@ use bson::*;
 
 
 
-
+const ROOT_ID: &str = "root";
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SkeletonNode {
     id: String,
     title: String,
-    child_ids: Vec<usize>,
+    child_ids: Vec<String>,
 }
 
+pub struct SkeletonHandle {
+    root: Mutex<RefCell<SkeletonNode>>,
+    nodes: Mutex<HashMap<String,SkeletonNode>>,
+}
 
+pub struct SkeletonHandleRef {
+    ptr: Arc<SkeletonHandle>,
+}
 
+impl SkeletonHandle {
+    pub fn new() -> SkeletonHandle {
+        let root = SkeletonNode { id: ROOT_ID.to_string(), title: ROOT_ID.to_string(), child_ids: vec![] };
+        SkeletonHandle { root: Mutex::new(RefCell::new(root)), nodes: Mutex::new(HashMap::new()) }
+    }
+
+    fn top_level_ids(&self) -> Vec<String> {
+        self.root.lock().unwrap().borrow().child_ids.clone()
+    }
+
+    pub fn add_node(&mut self, node: SkeletonNode, parent: Option<&str>) -> Result<()> {
+        match parent {
+            Some(pid) => {
+                let mut hm = self.nodes.lock().unwrap();
+                let parent_node = hm.get_mut(pid);
+                if parent_node.is_some() {
+                    parent_node.unwrap().add_child(pid);
+                }
+                Ok(())
+            },
+            None => {
+                let root = self.root.lock();
+                root.unwrap().borrow_mut().add_child(&node.id[..]);
+                let mut hm = self.nodes.lock().unwrap();
+                let id_clone = node.id.clone();
+                hm.insert(id_clone, node);
+                Ok(())
+            },
+        }
+    }
+
+}
+
+impl SkeletonNode {
+    pub fn new(id: &str, title: &str) -> SkeletonNode {
+        SkeletonNode { id: id.to_string(), title: title.to_string(), child_ids: vec![] }
+    }
+    pub fn add_child(&mut self, id: &str) {
+        self.child_ids.push(id.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_node_skeleton() {
+        let mut h = SkeletonHandle::new();
+        let n1 = SkeletonNode::new("n1", "top-level-node");
+        h.add_node(n1, None);
+        let tl = h.top_level_ids();
+        assert_eq!(tl.len(), 1);
+        let n2 = SkeletonNode::new("n2", "child-node");
+        h.add_node(n2, Some("n1"));
+        let tl2 = h.top_level_ids();
+        assert_eq!(tl2.len(), 1);
+    }
+}
 
 
 
