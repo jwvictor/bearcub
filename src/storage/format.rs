@@ -23,11 +23,13 @@ pub struct SkeletonNode {
     child_ids: Vec<String>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SkeletonHandle {
     root: SkeletonNode,
     nodes: HashMap<String,SkeletonNode>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SkeletonHandleRef {
     ptr: Arc<Mutex<RefCell<SkeletonHandle>>>,
 }
@@ -118,9 +120,10 @@ impl SkeletonHandleRef {
         SkeletonHandleRef { ptr: Arc::new(Mutex::new(RefCell::new(SkeletonHandle::new()))) }
     }
 
-    fn top_level_ids(&self) -> Vec<String> {
-        self.ptr.lock().unwrap().borrow().root.child_ids.clone()
+    pub fn top_level_ids(&self) -> Vec<String> {
+        self.ptr.lock().unwrap().borrow().top_level_ids()
     }
+
     pub fn get(&self, id: &str) -> Option<SkeletonNode> {
         self.ptr.lock().unwrap().borrow().get(id)
     }
@@ -133,6 +136,14 @@ impl SkeletonHandleRef {
         let guard = self.ptr.lock().unwrap();
         let mut borrow = guard.borrow_mut();
         borrow.add_node(node, parent)
+    }
+
+    pub fn flush_to_file(&self, path: &str) -> Result<()> {
+        let bs_obj = bson::to_bson(&self)?;
+        let mut file = File::create(path)?;
+        let bs = bson::to_vec(&bs_obj)?;
+        file.write_all(&bs[..])?;
+        Ok(())
     }
 }
 
