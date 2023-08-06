@@ -24,44 +24,51 @@ pub struct SkeletonNode {
 }
 
 pub struct SkeletonHandle {
-    root: Mutex<RefCell<SkeletonNode>>,
-    nodes: Mutex<HashMap<String,SkeletonNode>>,
+    root: SkeletonNode,
+    nodes: HashMap<String,SkeletonNode>,
 }
 
 pub struct SkeletonHandleRef {
-    ptr: Arc<SkeletonHandle>,
+    ptr: Arc<Mutex<RefCell<SkeletonHandle>>>,
 }
 
 impl SkeletonHandle {
     pub fn new() -> SkeletonHandle {
         let root = SkeletonNode { id: ROOT_ID.to_string(), title: ROOT_ID.to_string(), child_ids: vec![] };
-        SkeletonHandle { root: Mutex::new(RefCell::new(root)), nodes: Mutex::new(HashMap::new()) }
+        SkeletonHandle { root: root, nodes: HashMap::new() }
     }
 
+
+}
+
+impl SkeletonHandleRef {
     fn top_level_ids(&self) -> Vec<String> {
-        self.root.lock().unwrap().borrow().child_ids.clone()
+        self.ptr.lock().unwrap().borrow().root.child_ids.clone()
     }
 
     pub fn add_node(&mut self, node: SkeletonNode, parent: Option<&str>) -> Result<()> {
         match parent {
             Some(pid) => {
-                let mut hm = self.nodes.lock().unwrap();
-                let parent_node = hm.get_mut(pid);
+                let guard = self.ptr.lock().unwrap();
+                let mut borrow = guard.borrow_mut();
+                let parent_node = borrow.nodes.get_mut(pid);
                 if parent_node.is_some() {
                     parent_node.unwrap().add_child(pid);
                 }
                 Ok(())
             },
             None => {
-                let root = self.root.lock();
-                root.unwrap().borrow_mut().add_child(&node.id[..]);
-                let mut hm = self.nodes.lock().unwrap();
+                let lockd = self.ptr.lock();
+                let selfr = lockd.unwrap();
+                let mut selfb = selfr.borrow_mut();
+                selfb.root.add_child(&node.id[..]);
                 let id_clone = node.id.clone();
-                hm.insert(id_clone, node);
+                selfb.nodes.insert(id_clone, node);
                 Ok(())
             },
         }
     }
+
 
 }
 
