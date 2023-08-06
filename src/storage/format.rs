@@ -2,13 +2,13 @@
 use serde::{Serialize, Deserialize};
 use anyhow::*;
 use std::cell::RefCell;
+use std::rc::Rc;
 use std::collections::HashMap;
 use std::sync::Mutex;
 use std::sync::Arc;
 use std::fs;
 use std::fs::File;
 use std::io::prelude::*;
-use std::rc::Rc;
 use bson::*;
 
 
@@ -48,6 +48,72 @@ impl SkeletonHandle {
             None => None,
         }
     }
+
+    pub fn add_node(&mut self, node: SkeletonNode, parent: Option<&str>) -> Result<()> {
+        match parent {
+            Some(pid) => {
+                let borrow = self;
+                let parent_node = borrow.nodes.get_mut(pid);
+                if parent_node.is_some() {
+                    parent_node.unwrap().add_child(&node.id[..]);
+                }
+                borrow.nodes.insert(node.id.clone(), node);
+                Ok(())
+            },
+            None => {
+                let selfb = self;
+                selfb.root.add_child(&node.id[..]);
+                let id_clone = node.id.clone();
+                selfb.nodes.insert(id_clone, node);
+                Ok(())
+            },
+        }
+    }
+
+    fn borrow(&self, id: &str) -> &SkeletonNode {
+        self.nodes.get(id).unwrap()
+    }
+
+    fn get_by_path_parts(&self, from_id: &str, parts: Rc<Vec<&str>>, parts_idx: usize) -> Option<SkeletonNode> {
+        println!("Running for: from {:?}, parts = {:?}, idx = {:?}", from_id, *parts, parts_idx);
+        let cur_node = self.borrow(from_id);
+        println!("Borrowed node {:?} - {:?}", from_id, &cur_node);
+        if cur_node.title.starts_with(parts[parts_idx]) {
+            // we have a match
+            if (parts.len() - parts_idx) == 1 {
+                return Some(cur_node.clone())
+            } else {
+                // recurse
+                println!("child ids: {:?}", &cur_node.child_ids);
+                for cid in &cur_node.child_ids {
+                    println!("recursing for {:?}", &cid);
+                    let res = self.get_by_path_parts(&cid[..], parts.clone(), parts_idx+1);
+                    if res.is_some() {
+                        return res;
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    fn top_level_ids(&self) -> Vec<String> {
+        self.root.child_ids.clone()
+    }
+
+    pub fn get_by_path(&self, path: &str) -> Option<SkeletonNode> {
+        let parts: Vec<&str> = path.split(":").collect();
+        let tli = self.top_level_ids();
+        let rc_parts = Rc::new(parts);
+        for n in tli {
+            let res = self.get_by_path_parts(&n[..], rc_parts.clone(), 0);
+            if res.is_some() {
+                return res;
+            }
+        }
+        None
+    }
+
 }
 
 impl SkeletonHandleRef {
@@ -63,28 +129,14 @@ impl SkeletonHandleRef {
         self.ptr.lock().unwrap().borrow().get(id)
     }
 
+    pub fn get_by_path(&self, id: &str) -> Option<SkeletonNode> {
+        self.ptr.lock().unwrap().borrow().get_by_path(id)
+    }
+
     pub fn add_node(&mut self, node: SkeletonNode, parent: Option<&str>) -> Result<()> {
-        match parent {
-            Some(pid) => {
-                let guard = self.ptr.lock().unwrap();
-                let mut borrow = guard.borrow_mut();
-                let parent_node = borrow.nodes.get_mut(pid);
-                if parent_node.is_some() {
-                    parent_node.unwrap().add_child(pid);
-                }
-                borrow.nodes.insert(node.id.clone(), node);
-                Ok(())
-            },
-            None => {
-                let lockd = self.ptr.lock();
-                let selfr = lockd.unwrap();
-                let mut selfb = selfr.borrow_mut();
-                selfb.root.add_child(&node.id[..]);
-                let id_clone = node.id.clone();
-                selfb.nodes.insert(id_clone, node);
-                Ok(())
-            },
-        }
+        let guard = self.ptr.lock().unwrap();
+        let mut borrow = guard.borrow_mut();
+        borrow.add_node(node, parent)
     }
 }
 
@@ -115,6 +167,10 @@ mod tests {
         assert_eq!(tl2.len(), 1);
         let gn1 = h.get("n2").unwrap();
         assert_eq!(gn1.title.eq("child-node"), true);
+        let gp1 = h.get_by_path("top").unwrap();
+        assert_eq!(gp1.id.eq("n1"), true);
+        let gp2 = h.get_by_path("top:chi").unwrap();
+        assert_eq!(gp2.id.eq("n2"), true);
     }
 }
 
