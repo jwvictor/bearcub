@@ -145,6 +145,12 @@ impl SkeletonHandleRef {
         file.write_all(&bs[..])?;
         Ok(())
     }
+
+    pub fn from_file(path: &str) -> Result<SkeletonHandleRef> {
+        let fp = fs::read(path)?;
+        let deser: SkeletonHandleRef = bson::from_slice(&fp[..])?;
+        Ok(deser)
+    }
 }
 
 impl SkeletonNode {
@@ -178,6 +184,12 @@ mod tests {
         assert_eq!(gp1.id.eq("n1"), true);
         let gp2 = h.get_by_path("top:chi").unwrap();
         assert_eq!(gp2.id.eq("n2"), true);
+        h.flush_to_file("testfile.bson");
+
+        let h2 = SkeletonHandleRef::from_file("testfile.bson").unwrap();
+        let h2_tlis = h2.top_level_ids();
+        assert_eq!(h2_tlis.len(), 1);
+        assert_eq!(h2_tlis[0], "n1");
     }
 }
 
