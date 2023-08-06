@@ -75,18 +75,14 @@ impl SkeletonHandle {
     }
 
     fn get_by_path_parts(&self, from_id: &str, parts: Rc<Vec<&str>>, parts_idx: usize) -> Option<SkeletonNode> {
-        println!("Running for: from {:?}, parts = {:?}, idx = {:?}", from_id, *parts, parts_idx);
         let cur_node = self.borrow(from_id);
-        println!("Borrowed node {:?} - {:?}", from_id, &cur_node);
         if cur_node.title.starts_with(parts[parts_idx]) {
             // we have a match
             if (parts.len() - parts_idx) == 1 {
                 return Some(cur_node.clone())
             } else {
                 // recurse
-                println!("child ids: {:?}", &cur_node.child_ids);
                 for cid in &cur_node.child_ids {
-                    println!("recursing for {:?}", &cid);
                     let res = self.get_by_path_parts(&cid[..], parts.clone(), parts_idx+1);
                     if res.is_some() {
                         return res;
