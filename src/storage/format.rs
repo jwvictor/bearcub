@@ -37,6 +37,17 @@ impl SkeletonHandle {
         let root = SkeletonNode { id: ROOT_ID.to_string(), title: ROOT_ID.to_string(), child_ids: vec![] };
         SkeletonHandle { root: root, nodes: HashMap::new() }
     }
+
+    pub fn get(&self, id: &str) -> Option<SkeletonNode> {
+        let rig = self.nodes.get(id);
+        match rig {
+            Some(x) => {
+                let y = x.clone();
+                Some(y)
+            },
+            None => None,
+        }
+    }
 }
 
 impl SkeletonHandleRef {
@@ -48,6 +59,9 @@ impl SkeletonHandleRef {
     fn top_level_ids(&self) -> Vec<String> {
         self.ptr.lock().unwrap().borrow().root.child_ids.clone()
     }
+    pub fn get(&self, id: &str) -> Option<SkeletonNode> {
+        self.ptr.lock().unwrap().borrow().get(id)
+    }
 
     pub fn add_node(&mut self, node: SkeletonNode, parent: Option<&str>) -> Result<()> {
         match parent {
@@ -58,6 +72,7 @@ impl SkeletonHandleRef {
                 if parent_node.is_some() {
                     parent_node.unwrap().add_child(pid);
                 }
+                borrow.nodes.insert(node.id.clone(), node);
                 Ok(())
             },
             None => {
@@ -98,6 +113,8 @@ mod tests {
         h.add_node(n2, Some("n1"));
         let tl2 = h.top_level_ids();
         assert_eq!(tl2.len(), 1);
+        let gn1 = h.get("n2").unwrap();
+        assert_eq!(gn1.title.eq("child-node"), true);
     }
 }
 
