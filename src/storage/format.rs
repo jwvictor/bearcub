@@ -37,11 +37,14 @@ impl SkeletonHandle {
         let root = SkeletonNode { id: ROOT_ID.to_string(), title: ROOT_ID.to_string(), child_ids: vec![] };
         SkeletonHandle { root: root, nodes: HashMap::new() }
     }
-
-
 }
 
 impl SkeletonHandleRef {
+
+    pub fn new() -> SkeletonHandleRef {
+        SkeletonHandleRef { ptr: Arc::new(Mutex::new(RefCell::new(SkeletonHandle::new()))) }
+    }
+
     fn top_level_ids(&self) -> Vec<String> {
         self.ptr.lock().unwrap().borrow().root.child_ids.clone()
     }
@@ -68,8 +71,6 @@ impl SkeletonHandleRef {
             },
         }
     }
-
-
 }
 
 impl SkeletonNode {
@@ -87,7 +88,8 @@ mod tests {
 
     #[test]
     fn test_node_skeleton() {
-        let mut h = SkeletonHandle::new();
+        // let mut h = SkeletonHandle::new();
+        let mut h = SkeletonHandleRef::new();
         let n1 = SkeletonNode::new("n1", "top-level-node");
         h.add_node(n1, None);
         let tl = h.top_level_ids();
