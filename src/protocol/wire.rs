@@ -1,7 +1,7 @@
 use bytes::{Bytes, BytesMut, BufMut, Buf};
 use std::io::{Cursor, Read};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Frame {
     pub user_id: Option<String>,
     pub n_remaining_frames: u32,

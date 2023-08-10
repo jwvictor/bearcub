@@ -1,17 +1,52 @@
 use crate::storage::format::*;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::sync::Mutex;
+use std::sync::Arc;
 use std::path::Path;
 use std::fs::create_dir_all;
 use anyhow::*;
 
+
+#[derive(Debug,Clone)]
+pub struct UserProvider {
+    data_dir: String,
+    providers: Arc<Mutex<RefCell<HashMap<String, Provider>>>>,
+}
+
+#[derive(Debug,Clone)]
 pub struct Provider {
     data_dir: String,
     user_id: String,
     skeleton: Option<SkeletonHandleRef>,
 }
 
+impl UserProvider {
+    pub fn new(data_dir: &str) -> UserProvider {
+        UserProvider { providers: Arc::new(Mutex::new(RefCell::new(HashMap::new()))), data_dir: data_dir.to_string() }
+    }
+
+    // TODO - change this thing to use the sharded model prototyped in sharding.rs
+    pub fn get(&self, uid: &str) -> Result<Provider> {
+        let mg = self.providers.lock().unwrap();
+        let mut borrow = mg.borrow_mut();
+        if borrow.contains_key(uid) {
+            let rig = borrow[uid].clone();
+            Ok(rig)
+        } else {
+            let new_prov = Provider::new(self.data_dir.clone(), uid.to_string())?;
+            let _ = borrow.insert(uid.to_string(), new_prov.clone());
+            Ok(new_prov)
+        }
+    }
+}
+
 impl Provider {
-    pub fn new(data_dir: String, user_id: String) -> Provider {
-        Provider { data_dir, user_id, skeleton: None }
+    pub fn new(data_dir: String, user_id: String) -> Result<Provider> {
+        let mut p = Provider { data_dir, user_id, skeleton: None };
+        p.check_root_structure();
+        p.check_storage_ready()?;
+        Ok(p)
     }
 
     fn user_data_path(&self) -> String {

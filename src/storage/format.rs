@@ -171,11 +171,11 @@ mod tests {
         // let mut h = SkeletonHandle::new();
         let mut h = SkeletonHandleRef::new();
         let n1 = SkeletonNode::new("n1", "top-level-node");
-        h.add_node(n1, None);
+        let _ = h.add_node(n1, None);
         let tl = h.top_level_ids();
         assert_eq!(tl.len(), 1);
         let n2 = SkeletonNode::new("n2", "child-node");
-        h.add_node(n2, Some("n1"));
+        let _ = h.add_node(n2, Some("n1"));
         let tl2 = h.top_level_ids();
         assert_eq!(tl2.len(), 1);
         let gn1 = h.get("n2").unwrap();
@@ -184,7 +184,8 @@ mod tests {
         assert_eq!(gp1.id.eq("n1"), true);
         let gp2 = h.get_by_path("top:chi").unwrap();
         assert_eq!(gp2.id.eq("n2"), true);
-        h.flush_to_file("testfile.bson");
+        let f_res = h.flush_to_file("testfile.bson");
+        assert_eq!(f_res.is_ok(), true);
 
         let h2 = SkeletonHandleRef::from_file("testfile.bson").unwrap();
         let h2_tlis = h2.top_level_ids();
