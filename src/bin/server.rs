@@ -29,19 +29,27 @@ async fn process(socket: TcpStream, user_provider: UserProvider) {
     let mut connection = Connection::new(socket);
     let mut frame_buf:Vec<Frame> = vec![];
     let mut cur_uid:Option<String> = None;
+    let mut rem_frames: usize;
 
     loop {
         if let Some(frame_opt) = connection.read_frame().await.ok() {
             if frame_opt.is_some() {
                 let frame = frame_opt.clone().unwrap();
-                if let Some(uid) = frame_opt.clone().unwrap().user_id {
+                frame_buf.push(frame);
+                
+                let f = frame_opt.unwrap(); // our copy
+                if let Some(uid) = f.user_id {
                     cur_uid = Some(uid);
                 }
-                
-                frame_buf.push(frame);
+                rem_frames = f.n_remaining_frames as usize;
                 // println!("GOT: {:?}", frame_opt.unwrap());
                 
-                // let prov = user_provider.get(&cur_uid.clone().unwrap()).unwrap();
+                if rem_frames == 1 {
+                    // This is the last frame
+                    // interpret frame_buf frames and 
+                    let prov = user_provider.get(&cur_uid.clone().unwrap()).unwrap();
+                    let _ = prov.get_skeleton_node("a"); // or whatever
+                }
 
                 // Respond with an error
                 let response = Frame::new(None, 0 as u32, 'd' as u8, Bytes::new());

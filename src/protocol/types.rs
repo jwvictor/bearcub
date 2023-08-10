@@ -1,6 +1,7 @@
+use anyhow::anyhow;
 use bytes::{BytesMut, Bytes, BufMut, Buf};
 use tokio::io::BufWriter;
-
+use anyhow::*;
 use super::wire::Frame;
 
 // TODO: implement protocol stuff for `user_id` field
@@ -76,6 +77,52 @@ impl ResponseMessage {
 }
 
 impl RequestMessage {
+
+    fn from_frames_getbyid(f: Frame) -> Result<RequestMessage> {
+        // the bytes are just the ID
+        let id_s = String::from_utf8(f.data.to_vec())?;
+        match f.user_id {
+            Some(uid) => 
+                Ok(RequestMessage::Get { user_id: uid, id: Some(id_s), path: None }),
+            _ => Err(anyhow!("rig"))
+        }
+    }
+
+    fn from_frames_getbypath(f: Frame) -> Result<RequestMessage> {
+        // the bytes are just the ID
+        let path_s = String::from_utf8(f.data.to_vec())?;
+        match f.user_id {
+            Some(uid) => 
+                Ok(RequestMessage::Get { user_id: uid, path: Some(path_s), id: None }),
+            _ => Err(anyhow!("rig"))
+        }
+    }
+
+    fn from_frames_put(frames: Vec<Frame>) -> Result<RequestMessage> {
+        // the bytes are just the ID
+        let mut data = BytesMut::with_capacity(frames.len() * BUF_CAP);
+        let mut f0 = frames[0].clone();
+        let id_bytes = f0.data.split_to(36);
+        let pid_bytes = f0.data.split_to(36);
+        let id_s = String::from_utf8(id_bytes.to_vec()).unwrap_or_else(|_| String::new());
+        let pid_opt = if pid_bytes.to_vec().iter().map(|x| *x != 0 as u8).reduce(|x,y| x || y).unwrap_or(false) { Some(String::from_utf8(pid_bytes.to_vec()).ok().unwrap_or_else(|| String::new())) } else { None };
+        data.put(f0.data.split_to(f0.data.len()));
+        for i in 1..frames.len() {
+            data.put(frames[i].data.clone());
+        }
+        Ok(RequestMessage::Put { user_id: f0.user_id.unwrap_or_else(|| String::new()), id: id_s, parent: pid_opt, data: data.freeze() })
+    }
+
+    pub fn from_frames(frames: Vec<Frame>) -> Result<RequestMessage> {
+        let f0 = frames[0].clone();
+        match f0.msg_type_flag {
+            b'G' => RequestMessage::from_frames_getbyid(f0),
+            b'P' => RequestMessage::from_frames_getbypath(f0),
+            b'p' => RequestMessage::from_frames_put(frames),
+            _ => Err(anyhow!("invalid msg_type_flag")),
+        }
+    }
+
     pub fn to_frames(self) -> Vec<Frame> {
         match self {
             RequestMessage::Get{user_id, id, path} => {
@@ -98,6 +145,7 @@ impl RequestMessage {
                 frames
             },
             RequestMessage::Remove{user_id, id} => {
+                // TODO - implementme
                 let mut frames = vec![];
                 frames
             },
@@ -105,10 +153,10 @@ impl RequestMessage {
     }
 }
 
-fn put_set_frames(user_id: String, msg_typ_code: u8, id: String, parent: Option<String>, mut data: Bytes) -> Vec<Frame> {
+fn put_set_frames(user_id: String, msg_typ_code: u8, id: String, parent: Option<String>, blob_data: Bytes) -> Vec<Frame> {
     let mut frames = vec![];
     let fr_sz = DATA_BYTES_PER_FRAME;
-    let mut buf = BytesMut::with_capacity(fr_sz);
+    let mut buf = BytesMut::with_capacity(blob_data.len() + 36 + 36);
     buf.put_slice(id.as_bytes());
     if let Some(pid) = parent {
         buf.put_slice(pid.as_bytes());
@@ -118,6 +166,10 @@ fn put_set_frames(user_id: String, msg_typ_code: u8, id: String, parent: Option<
             buf.put_u8(0 as u8);
         }
     }
+    buf.put(blob_data);
+
+    let mut data = Bytes::from(buf);
+
     let mut n_frames = data.len() / fr_sz;
     if data.len() % fr_sz != 0 {
         n_frames += 1;
@@ -129,7 +181,7 @@ fn put_set_frames(user_id: String, msg_typ_code: u8, id: String, parent: Option<
         println!("ctr = {}, bytes left = {}", ctr, bytes_left);
         let bytes_to_write = bytes_left.min(fr_sz);
         let fr_dat = data.split_to(bytes_to_write);
-        let mtc = if(ctr == 0) { msg_typ_code } else { 'd' as u8 }; // Continued data frame
+        let mtc = if ctr == 0 { msg_typ_code } else { 'd' as u8 }; // Continued data frame
         frames.push(Frame::new(uid_opt, (n_frames - ctr) as u32, mtc, fr_dat));
         uid_opt = None;
         ctr += 1;
@@ -163,9 +215,9 @@ mod tests {
         }
         let msg = RequestMessage::Set {user_id: "2ab3da63-e24f-47e2-9b56-f3d19fade0cf".to_string(),  id: id_str.clone(), data: data_buf.freeze() };
         let frames = msg.to_frames();
-       
+
         assert_eq!(frames.len(), 3);
-        
+
         for i in 0..(frames.len() - 1) {
             if i == 0 {
                 assert_eq!(frames[i].size(), 13 + 36 + DATA_BYTES_PER_FRAME);
@@ -175,8 +227,14 @@ mod tests {
         }
 
         let mut new_buf = BytesMut::with_capacity(BUF_CAP*2);
-        for f in frames {
-            new_buf.put(f.data);
+        for fi in 0..frames.len() {
+            let mut f = frames[fi].clone();
+            if fi > 0 {
+                new_buf.put(f.data);
+            } else {
+                let _ = f.data.split_to(72);
+                new_buf.put(f.data);
+            }
         }
 
         let new_bytes = new_buf.to_vec();

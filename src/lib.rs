@@ -1,6 +1,7 @@
 pub mod protocol {
     pub mod types;
     pub mod wire;
+    pub mod blobs;
 }
 
 pub mod server {
