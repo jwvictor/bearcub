@@ -47,6 +47,8 @@ pub const DATA_BYTES_PER_FRAME : usize = BUF_CAP - BUF_CAP_HEADER_SZ_RES;
 // Error codes
 pub const ERR_CODE_INVALID_MSG: u32 = 11;
 pub const ERR_DESC_INVALID_MSG: &'static str = "invalid message";
+pub const ERR_CODE_NO_SUCH_ENTITY: u32 = 12;
+pub const ERR_DESC_NO_SUCH_ENTITY: &'static str = "no such entity";
 
 impl ResponseMessage {
     pub fn to_frames(mut self) -> Vec<Frame> {

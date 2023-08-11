@@ -1,5 +1,7 @@
 use crate::protocol::types::ERR_CODE_INVALID_MSG;
+use crate::protocol::types::ERR_CODE_NO_SUCH_ENTITY;
 use crate::protocol::types::ERR_DESC_INVALID_MSG;
+use crate::protocol::types::ERR_DESC_NO_SUCH_ENTITY;
 use crate::protocol::types::RequestMessage;
 use crate::protocol::types::ResponseMessage;
 use crate::storage::format::*;
@@ -10,6 +12,7 @@ use std::sync::Arc;
 use std::path::Path;
 use std::fs::create_dir_all;
 use anyhow::*;
+use bytes::Bytes;
 
 
 #[derive(Debug,Clone)]
@@ -63,6 +66,16 @@ impl Provider {
         filename
     }
 
+    fn blob_filename(&self, id: &str) -> String {
+        let filename = format!("{}/{}.json", self.user_data_path(), id);
+        filename
+    }
+
+    pub fn load_blob_data(&self, id: &str) -> Result<Vec<u8>> {
+        let s = std::fs::read(self.blob_filename(id))?;
+        Ok(s)
+    }
+
     pub fn check_root_structure(&mut self) {
         if self.skeleton.is_some() {
             return;
@@ -102,7 +115,13 @@ impl Provider {
     pub fn respond_to(&self, request:RequestMessage) -> Result<ResponseMessage> {
         match request {
             RequestMessage::Get { user_id, id, path } => {
-                Ok(ResponseMessage::Error { code: ERR_CODE_INVALID_MSG, description: ERR_DESC_INVALID_MSG.to_string() })
+                match id {
+                    Some(ids) => {
+                        let dat = self.load_blob_data(&ids)?;
+                        Ok(ResponseMessage::Data { data: Bytes::from(dat) })
+                    },
+                    _ => Ok(ResponseMessage::Error { code: ERR_CODE_NO_SUCH_ENTITY, description: ERR_DESC_NO_SUCH_ENTITY.to_string() }),
+                }
             },
             _ => Ok(ResponseMessage::Error { code: ERR_CODE_INVALID_MSG, description: ERR_DESC_INVALID_MSG.to_string() }),
         }
