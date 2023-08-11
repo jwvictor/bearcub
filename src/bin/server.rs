@@ -1,9 +1,10 @@
 
 use std::collections::HashMap;
 
-use bearcub::{server::{connection::Connection, provider::UserProvider}, protocol::wire::Frame, server::provider::Provider};
+use bearcub::{server::{connection::Connection, provider::UserProvider}, protocol::{wire::Frame, types::{RequestMessage, ResponseMessage}}, server::provider::Provider};
 use tokio::net::{TcpListener, TcpStream};
 use bytes::Bytes;
+use anyhow::*;
 
 #[tokio::main]
 async fn main() {
@@ -46,17 +47,46 @@ async fn process(socket: TcpStream, user_provider: UserProvider) {
                 
                 if rem_frames == 1 {
                     // This is the last frame
-                    // interpret frame_buf frames and 
+                    let my_frames = frame_buf;
+                    frame_buf = vec![];
                     let prov = user_provider.get(&cur_uid.clone().unwrap()).unwrap();
-                    let _ = prov.get_skeleton_node("a"); // or whatever
-                }
+                    // let _ = prov.get_skeleton_node("a"); // or whatever
+                    let this_msg = RequestMessage::from_frames(my_frames);
+                    let reply = match this_msg {
+                        Result::Ok(msg) => {
+                            let response_msg = prov.respond_to(msg).unwrap_or_else(|_| ResponseMessage::Error { code: 2, description: "invalid message data".to_string() });
+                            response_msg
+                        },
+                        _ => {
+                            // Write error back to user
+                            let resp_err = ResponseMessage::Error { code: 2, description: "invalid message data".to_string() };
+                            resp_err
+                        },
+                    };
 
-                // Respond with an error
-                let response = Frame::new(None, 0 as u32, 'd' as u8, Bytes::new());
-                let write_res = connection.write_frame(&response).await;
-                if !write_res.is_ok() {
-                    println!("client closed socket, breaking out...");
-                    break;
+                    let frames = reply.to_frames();
+                    let mut write_res: Result<usize> = Err(anyhow!("no frames to write"));
+                    let mut fi: usize = 0;
+                    'inner: loop {
+                        if fi >= frames.len() {
+                            break 'inner;
+                        }
+                        let f = &frames[fi];
+                        write_res = connection.write_frame(f).await;
+                        if !write_res.is_ok() {
+                            break 'inner;
+                        }
+                        fi += 1;
+                    }
+                    match write_res {
+                        Err(_z) => {
+                            println!("client closed socket, breaking out...");
+                            break;
+                        },
+                        _ => (),
+                    }
+
+
                 }
             }
         }

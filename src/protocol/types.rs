@@ -44,6 +44,10 @@ pub const BUF_CAP: usize = 4096;
 pub const BUF_CAP_HEADER_SZ_RES: usize = 128;
 pub const DATA_BYTES_PER_FRAME : usize = BUF_CAP - BUF_CAP_HEADER_SZ_RES;
 
+// Error codes
+pub const ERR_CODE_INVALID_MSG: u32 = 11;
+pub const ERR_DESC_INVALID_MSG: &'static str = "invalid message";
+
 impl ResponseMessage {
     pub fn to_frames(mut self) -> Vec<Frame> {
         match &mut self {

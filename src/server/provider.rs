@@ -1,3 +1,7 @@
+use crate::protocol::types::ERR_CODE_INVALID_MSG;
+use crate::protocol::types::ERR_DESC_INVALID_MSG;
+use crate::protocol::types::RequestMessage;
+use crate::protocol::types::ResponseMessage;
 use crate::storage::format::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -93,5 +97,15 @@ impl Provider {
             Some(root) => root.get(id),
             None => None,
         }
+    }
+
+    pub fn respond_to(&self, request:RequestMessage) -> Result<ResponseMessage> {
+        match request {
+            RequestMessage::Get { user_id, id, path } => {
+                Ok(ResponseMessage::Error { code: ERR_CODE_INVALID_MSG, description: ERR_DESC_INVALID_MSG.to_string() })
+            },
+            _ => Ok(ResponseMessage::Error { code: ERR_CODE_INVALID_MSG, description: ERR_DESC_INVALID_MSG.to_string() }),
+        }
+        
     }
 }
