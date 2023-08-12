@@ -160,6 +160,9 @@ impl SkeletonNode {
     pub fn add_child(&mut self, id: &str) {
         self.child_ids.push(id.to_string())
     }
+    pub fn id(&self) -> &str {
+        &self.id[..]
+    }
 }
 
 #[cfg(test)]

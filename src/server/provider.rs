@@ -112,10 +112,31 @@ impl Provider {
         }
     }
 
+    pub fn get_node_by_path(&self, path: &str) -> Option<SkeletonNode> {
+        match &self.skeleton {
+            Some(root) => root.get_by_path(path),
+            None => None,
+        }
+    }
+
     pub fn respond_to(&self, request:RequestMessage) -> Result<ResponseMessage> {
         match request {
-            RequestMessage::Get { user_id, id, path } => {
-                match id {
+            RequestMessage::Get { user_id: _, id, path } => {
+                if id.is_none() && path.is_none() {
+                    return Ok(ResponseMessage::Error { code: ERR_CODE_NO_SUCH_ENTITY, description: ERR_DESC_NO_SUCH_ENTITY.to_string() })
+                }
+                let blob_id_opt = match id {
+                    Some(ids) => Some(ids),
+                    _ => {
+                        let rel_node = self.get_node_by_path(&path.unwrap());
+                        match rel_node {
+                            Some(node) => Some(String::from(node.id())),
+                            _ => None,
+                        }
+                        //
+                    },
+                };
+                match blob_id_opt {
                     Some(ids) => {
                         let dat = self.load_blob_data(&ids)?;
                         Ok(ResponseMessage::Data { data: Bytes::from(dat) })

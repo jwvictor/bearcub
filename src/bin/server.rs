@@ -1,7 +1,7 @@
 
 use std::collections::HashMap;
 
-use bearcub::{server::{connection::Connection, provider::UserProvider}, protocol::{wire::Frame, types::{RequestMessage, ResponseMessage}}, server::provider::Provider};
+use bearcub::{server::{connection::Connection, provider::UserProvider}, protocol::{wire::Frame, types::{RequestMessage, ResponseMessage, ERR_CODE_INVALID_MSG, ERR_DESC_INVALID_MSG}}, server::provider::Provider};
 use tokio::net::{TcpListener, TcpStream};
 use bytes::Bytes;
 use anyhow::*;
@@ -54,7 +54,8 @@ async fn process(socket: TcpStream, user_provider: UserProvider) {
                     let this_msg = RequestMessage::from_frames(my_frames);
                     let reply = match this_msg {
                         Result::Ok(msg) => {
-                            let response_msg = prov.respond_to(msg).unwrap_or_else(|_| ResponseMessage::Error { code: 2, description: "invalid message data".to_string() });
+                            println!("got message: {:?}", &msg);
+                            let response_msg = prov.respond_to(msg).unwrap_or_else(|_| ResponseMessage::Error { code: ERR_CODE_INVALID_MSG, description: ERR_DESC_INVALID_MSG.to_string() });
                             response_msg
                         },
                         _ => {
