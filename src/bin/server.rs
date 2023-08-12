@@ -49,7 +49,7 @@ async fn process(socket: TcpStream, user_provider: UserProvider) {
                     // This is the last frame
                     let my_frames = frame_buf;
                     frame_buf = vec![];
-                    let prov = user_provider.get(&cur_uid.clone().unwrap()).unwrap();
+                    let mut prov = user_provider.get(&cur_uid.clone().unwrap()).unwrap();
                     // let _ = prov.get_skeleton_node("a"); // or whatever
                     let this_msg = RequestMessage::from_frames(my_frames);
                     let reply = match this_msg {

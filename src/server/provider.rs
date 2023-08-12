@@ -1,3 +1,4 @@
+use crate::protocol::blobs::extract_title;
 use crate::protocol::types::ERR_CODE_INVALID_MSG;
 use crate::protocol::types::ERR_CODE_NO_SUCH_ENTITY;
 use crate::protocol::types::ERR_DESC_INVALID_MSG;
@@ -119,7 +120,22 @@ impl Provider {
         }
     }
 
-    pub fn respond_to(&self, request:RequestMessage) -> Result<ResponseMessage> {
+    pub fn put_node(&mut self, id: &str, parent_id: Option<&str>, mut data_bytes: Bytes) -> Result<()> {
+        match &mut self.skeleton {
+            Some(root) => {
+                let title = extract_title(data_bytes);
+                if !title.is_ok() {
+                    return Err(anyhow!("invalid state"));
+                }
+                let title_s = title.unwrap();
+                let x = root.add_node(SkeletonNode::new(id, &title_s[..]), parent_id);
+                x
+            },
+            None => Err(anyhow!("invalid state")),
+        }
+    }
+
+    pub fn respond_to(&mut self, request:RequestMessage) -> Result<ResponseMessage> {
         match request {
             RequestMessage::Get { user_id: _, id, path } => {
                 if id.is_none() && path.is_none() {
@@ -144,8 +160,16 @@ impl Provider {
                     _ => Ok(ResponseMessage::Error { code: ERR_CODE_NO_SUCH_ENTITY, description: ERR_DESC_NO_SUCH_ENTITY.to_string() }),
                 }
             },
+            RequestMessage::Put { user_id: _, id, parent, data } => {
+                let x = self.put_node(&id[..], parent.as_deref(), data);
+                if x.is_ok() {
+                    Ok(ResponseMessage::Data { data: Bytes::from(vec![]) })
+                } else {
+                    Ok(ResponseMessage::Error { code: ERR_CODE_INVALID_MSG, description: ERR_DESC_INVALID_MSG.to_string() })
+                }
+            },
             _ => Ok(ResponseMessage::Error { code: ERR_CODE_INVALID_MSG, description: ERR_DESC_INVALID_MSG.to_string() }),
         }
-        
+
     }
 }
