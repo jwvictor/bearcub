@@ -24,7 +24,7 @@ async fn main() {
     // let frame = Frame::new(Some("e17ca57f-a8db-4a0d-b9a9-6ff9edc983fd".to_string()), 1 as u32, 'G' as u8, Bytes::from_static(b"abc"));
     // conn.write_frame(&frame).await;
     // conn.write_frame(&frame).await;
-    let z = conn.read_frame().await.unwrap();
+    // let z = conn.read_frame().await.unwrap();
     loop {
         let read_res = conn.read_frame().await;
         if let Some(frame) = read_res.ok() {

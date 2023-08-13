@@ -62,6 +62,7 @@ pub fn is_user_id_required_msgtype(msg_type_flag:u8) -> bool {
 
 pub fn check_frame(buf:&mut Cursor<&[u8]>, buf_len: usize) -> Option<usize> {
     if buf_len < (13 as usize) {
+        println!("buffer too short to read header");
         None
     } else {
         buf.set_position(4);
@@ -69,7 +70,9 @@ pub fn check_frame(buf:&mut Cursor<&[u8]>, buf_len: usize) -> Option<usize> {
         match buf.read_exact(&mut sz4) {
             Ok(_) => {
                 let sz = u32::from_be_bytes(sz4);
+                println!("message size is {}, need at least a buffer that long (buffer is {})...", (sz as usize), buf_len);
                 if buf_len >= (sz as usize) {
+                println!("returning size {}, (buffer is {})...", (sz as usize), buf_len);
                     Some(sz as usize)
                 } else {
                     None

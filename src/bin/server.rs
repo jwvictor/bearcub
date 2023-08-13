@@ -68,6 +68,7 @@ async fn process(socket: TcpStream, user_provider: UserProvider) {
                     };
 
                     let frames = reply.to_frames();
+                    println!("got {} frames to write back...", frames.len());
                     let mut write_res: Result<usize> = Err(anyhow!("no frames to write"));
                     let mut fi: usize = 0;
                     'inner: loop {

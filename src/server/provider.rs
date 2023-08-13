@@ -130,7 +130,7 @@ impl Provider {
             Some(root) => {
                 let title = extract_title(data_bytes);
                 if !title.is_ok() {
-                    println!("error extracting title: {:?}", title.unwrap_err());
+                    // println!("error extracting title: {:?}", title.unwrap_err());
                     return Err(anyhow!("no title found in data"));
                 }
                 let title_s = title.unwrap();
@@ -169,9 +169,8 @@ impl Provider {
             RequestMessage::Put { user_id: _, id, parent, data } => {
                 let x = self.put_node(&id[..], parent.as_deref(), data);
                 if x.is_ok() {
-                    Ok(ResponseMessage::Data { data: Bytes::from(vec![]) })
+                    Ok(ResponseMessage::Data { data: Bytes::from("SUCCESS") })
                 } else {
-                    println!("put_node returned false: {:?}", x.unwrap_err());
                     Ok(ResponseMessage::Error { code: ERR_CODE_INVALID_MSG, description: ERR_DESC_INVALID_MSG.to_string() })
                 }
             },

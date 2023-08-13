@@ -34,8 +34,11 @@ impl Connection {
 
     pub async fn read_frame(&mut self) -> Result<Option<Frame>> {
         loop {
-            if let Some(frame) = self.parse_frame().ok() {
+            let parse_res = self.parse_frame();
+            if let Result::Ok(frame) = parse_res {
                 return Ok(frame)
+            } else {
+                println!("Error parsing frame: {:?}", parse_res.unwrap_err());
             }
 
             println!("Insufficient data in buffer: {}", String::from_utf8_lossy(&self.buffer.to_vec()[..]));
@@ -57,6 +60,7 @@ impl Connection {
         if n.is_ok() {
             Ok(n.unwrap())
         } else {
+            println!("error writing frame: {:?}", n.unwrap_err());
             Err(anyhow!("stream write err"))
         }
     }

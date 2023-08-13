@@ -1,5 +1,6 @@
 use anyhow::anyhow;
 use bytes::{BytesMut, Bytes, BufMut, Buf};
+use std::io::Cursor;
 use tokio::io::BufWriter;
 use anyhow::*;
 use super::wire::Frame;
@@ -199,6 +200,8 @@ fn put_set_frames(user_id: String, msg_typ_code: u8, id: String, parent: Option<
 
 #[cfg(test)]
 mod tests {
+    use crate::protocol::wire::try_parse_frame;
+
     // Note this useful idiom: importing names from outer (for mod tests) scope.
     use super::*;
 
@@ -248,4 +251,23 @@ mod tests {
             assert_eq!(b, 3 as u8);
         }
     }
+
+    #[test]
+    fn test_data_frames() {
+        let small_data = "hello";
+        let msg = ResponseMessage::Data { data: Bytes::from(small_data) };
+        let frames = msg.to_frames();
+        assert_eq!(frames.len(), 1);
+        for fi in 0..frames.len() {
+            let f = &frames[fi];
+            let bs = f.to_bytes();
+            let mut curs = Cursor::new(&bs[..]);
+            let f2 = try_parse_frame(&mut curs, bs.len());
+            let frame2 = f2.unwrap();
+            assert_eq!(frame2.msg_type_flag == ('d' as u8), true);
+            let s = String::from_utf8(frame2.data.to_vec()).unwrap();
+            assert!(s.eq("hello"));
+        }
+    }
+
 }
