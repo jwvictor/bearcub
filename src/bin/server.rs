@@ -56,11 +56,13 @@ async fn process(socket: TcpStream, user_provider: UserProvider) {
                         Result::Ok(msg) => {
                             println!("got message: {:?}", &msg);
                             let response_msg = prov.respond_to(msg).unwrap_or_else(|_| ResponseMessage::Error { code: ERR_CODE_INVALID_MSG, description: ERR_DESC_INVALID_MSG.to_string() });
+                            println!("response message: {:?}", &response_msg);
                             response_msg
                         },
                         _ => {
                             // Write error back to user
-                            let resp_err = ResponseMessage::Error { code: 2, description: "invalid message data".to_string() };
+                            println!("invalid message");
+                            let resp_err = ResponseMessage::Error { code: ERR_CODE_INVALID_MSG, description: ERR_DESC_INVALID_MSG.to_string() };
                             resp_err
                         },
                     };

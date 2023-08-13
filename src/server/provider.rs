@@ -52,8 +52,8 @@ impl UserProvider {
 impl Provider {
     pub fn new(data_dir: String, user_id: String) -> Result<Provider> {
         let mut p = Provider { data_dir, user_id, skeleton: None };
-        p.check_root_structure();
         p.check_storage_ready()?;
+        p.check_root_structure();
         Ok(p)
     }
 
@@ -84,6 +84,11 @@ impl Provider {
 
         let filename = self.skeleton_filename();
         self.skeleton = SkeletonHandleRef::from_file(&filename[..]).ok();
+        if self.skeleton.is_none() {
+            // no such file exists
+            println!("no file exists, creating empty structure...");
+            self.skeleton = Some(SkeletonHandleRef::new());
+        }
     }
 
     pub fn check_storage_ready(&self) -> anyhow::Result<()> {
@@ -98,8 +103,8 @@ impl Provider {
     }
 
     pub fn flush(&mut self) -> Result<()> {
-        self.check_root_structure();
         self.check_storage_ready()?;
+        self.check_root_structure();
         match &self.skeleton {
             Some(root) => root.flush_to_file(&self.skeleton_filename()[..]),
             None => Ok(()),
@@ -125,13 +130,14 @@ impl Provider {
             Some(root) => {
                 let title = extract_title(data_bytes);
                 if !title.is_ok() {
-                    return Err(anyhow!("invalid state"));
+                    println!("error extracting title: {:?}", title.unwrap_err());
+                    return Err(anyhow!("no title found in data"));
                 }
                 let title_s = title.unwrap();
                 let x = root.add_node(SkeletonNode::new(id, &title_s[..]), parent_id);
                 x
             },
-            None => Err(anyhow!("invalid state")),
+            None => Err(anyhow!("no state loaded")),
         }
     }
 
@@ -165,6 +171,7 @@ impl Provider {
                 if x.is_ok() {
                     Ok(ResponseMessage::Data { data: Bytes::from(vec![]) })
                 } else {
+                    println!("put_node returned false: {:?}", x.unwrap_err());
                     Ok(ResponseMessage::Error { code: ERR_CODE_INVALID_MSG, description: ERR_DESC_INVALID_MSG.to_string() })
                 }
             },
