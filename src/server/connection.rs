@@ -1,15 +1,18 @@
-use std::io::Cursor;
-use std::fmt;
-
+use std::{io::Cursor, time::SystemTime};
 use bytes::{BytesMut, Buf};
 use tokio::{net::TcpStream, io::{AsyncReadExt, AsyncWriteExt}};
 use anyhow::*;
 
 use crate::protocol::{types::*, wire::{Frame, check_frame, try_parse_frame}};
 
+const CXN_FIRST_BYTE_TIMEOUT_MS: u32 = 5000;
+const CXN_RECENT_BYTE_TIMEOUT_MS: u32 = 5000;
+
 pub struct Connection {
     stream: TcpStream,
     buffer: BytesMut,
+    last_recv_time: Option<SystemTime>,
+    cxn_start_time: SystemTime,
 }
 
 impl Connection {
@@ -18,6 +21,8 @@ impl Connection {
             stream,
             // Allocate the buffer with enough capacity to hold 4 frames.
             buffer: BytesMut::with_capacity(BUF_CAP * 4),
+            last_recv_time: None,
+            cxn_start_time: SystemTime::now(),
         }
     }
 
@@ -48,7 +53,26 @@ impl Connection {
                 } else {
                     return Err(anyhow!("read error"));
                 }
+            } else {
+                let t = SystemTime::now();
+                self.last_recv_time = Some(t);
             }
+        }
+    }
+
+    pub fn is_timed_out(&self) -> bool {
+        let t_now = SystemTime::now();
+        match self.last_recv_time {
+            Some(t) => {
+                //
+                let dur_diff = t_now.duration_since(t);
+                dur_diff.unwrap().as_millis() > (CXN_RECENT_BYTE_TIMEOUT_MS as u128)
+            },
+            None => {
+                // if it's none, 0 bytes have been received, so work off cxn start time
+                let dur_diff = t_now.duration_since(self.cxn_start_time);
+                dur_diff.unwrap().as_millis() > (CXN_FIRST_BYTE_TIMEOUT_MS as u128)
+            },
         }
     }
 

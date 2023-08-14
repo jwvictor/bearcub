@@ -92,6 +92,9 @@ async fn process(socket: TcpStream, user_provider: UserProvider) {
 
 
                 }
+            } else {
+                println!("got the else case");
+                break;
             }
         }
 
