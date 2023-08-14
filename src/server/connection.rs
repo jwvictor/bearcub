@@ -5,6 +5,8 @@ use anyhow::*;
 
 use crate::protocol::{types::*, wire::{Frame, check_frame, try_parse_frame}};
 
+use super::provider::UserProvider;
+
 const CXN_FIRST_BYTE_TIMEOUT_MS: u32 = 5000;
 const CXN_RECENT_BYTE_TIMEOUT_MS: u32 = 5000;
 
@@ -13,6 +15,101 @@ pub struct Connection {
     buffer: BytesMut,
     last_recv_time: Option<SystemTime>,
     cxn_start_time: SystemTime,
+}
+
+pub trait Frameable {
+    fn to_frames(&self) -> Vec<Frame>; 
+    fn from_frames(_: Vec<Frame>) -> Self;
+}
+
+pub enum BearcubMessage {
+    Request {
+        msg: RequestMessage,
+    },
+    Response {
+        msg: ResponseMessage,
+    },
+}
+
+pub async fn listen<F>(socket: TcpStream, callback: F) where
+    F: Fn(BearcubMessage) -> Option<BearcubMessage> {
+    // The `Connection` lets us read/write redis **frames** instead of
+    // byte streams. The `Connection` type is defined by mini-redis.
+    let mut connection = Connection::new(socket);
+    let mut frame_buf:Vec<Frame> = vec![];
+    let mut rem_frames: usize;
+
+    loop {
+        if let Some(frame_opt) = connection.read_frame().await.ok() {
+            if frame_opt.is_some() {
+                let frame = frame_opt.clone().unwrap();
+                frame_buf.push(frame);
+                
+                let f = frame_opt.unwrap(); // our copy
+                rem_frames = f.n_remaining_frames as usize;
+                // println!("GOT: {:?}", frame_opt.unwrap());
+                
+                if rem_frames == 1 {
+                    // This is the last frame
+                    let my_frames = frame_buf;
+                    frame_buf = vec![];
+                    let this_msg = RequestMessage::from_frames(my_frames);
+                    let reply = match this_msg {
+                        Result::Ok(msg) => {
+                            println!("got message: {:?}", &msg);
+                            let response_msg = callback(BearcubMessage::Request { msg }).map(|x| match x {
+                                BearcubMessage::Request { .. } => ResponseMessage::Error { code: ERR_CODE_INVALID_MSG, description: ERR_DESC_INVALID_MSG.to_string() },
+                                BearcubMessage::Response { msg } => {
+                                    msg
+                                },
+                            });
+                            println!("response message: {:?}", &response_msg);
+                            response_msg
+                        },
+                        _ => {
+                            // Write error back to user
+                            println!("invalid message");
+                            let resp_err = ResponseMessage::Error { code: ERR_CODE_INVALID_MSG, description: ERR_DESC_INVALID_MSG.to_string() };
+                            Some(resp_err)
+                        },
+                    };
+
+                    if reply.is_none() {
+                        break;
+                    }
+
+                    let frames = reply.unwrap().to_frames();
+                    println!("got {} frames to write back...", frames.len());
+                    let mut write_res: Result<usize> = Err(anyhow!("no frames to write"));
+                    let mut fi: usize = 0;
+                    'inner: loop {
+                        if fi >= frames.len() {
+                            break 'inner;
+                        }
+                        let f = &frames[fi];
+                        write_res = connection.write_frame(f).await;
+                        if !write_res.is_ok() {
+                            break 'inner;
+                        }
+                        fi += 1;
+                    }
+                    match write_res {
+                        Err(_z) => {
+                            println!("client closed socket, breaking out...");
+                            break;
+                        },
+                        _ => (),
+                    }
+
+
+                }
+            } else {
+                println!("got the else case");
+                break;
+            }
+        }
+
+    }
 }
 
 impl Connection {
