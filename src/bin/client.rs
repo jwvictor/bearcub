@@ -1,10 +1,17 @@
 use std::net::SocketAddr;
 
-use bearcub::{say_hello, server::connection::Connection, protocol::{wire::Frame, types::RequestMessage}};
+use bearcub::{say_hello, server::connection::Connection, protocol::{wire::Frame, types::{RequestMessage, ResponseMessage}}};
 use bytes::Bytes;
 use tokio::{net::TcpStream, io::AsyncWriteExt};
 use anyhow::*;
 
+async fn receive_message(mut conn: Connection) -> Result<Option<ResponseMessage>> {
+
+    let mut frame_buf:Vec<Frame> = vec![];
+    let mut rem_frames: usize;
+
+    Ok(None)
+}
 
 #[tokio::main]
 async fn main() {
@@ -32,7 +39,10 @@ async fn main() {
                 Some(data) => {
                     println!("GOT FRAME: {:?}", data);
                 },
-                None => break,
+                None => {
+                    println!("read none frame - breaking");
+                    break;
+                },
             }
         }
     }
