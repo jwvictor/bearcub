@@ -31,11 +31,10 @@ pub enum BearcubMessage {
     },
 }
 
-pub async fn listen<F>(socket: TcpStream, is_client_side: bool, callback: F) where
-    F: Fn(BearcubMessage) -> Option<BearcubMessage> {
+pub async fn listen<F>(mut connection: Connection, is_client_side: bool, mut callback: F) where
+F: FnMut(BearcubMessage) -> Option<BearcubMessage> {
     // The `Connection` lets us read/write redis **frames** instead of
     // byte streams. The `Connection` type is defined by mini-redis.
-    let mut connection = Connection::new(socket);
     let mut frame_buf:Vec<Frame> = vec![];
     let mut rem_frames: usize;
 
@@ -44,7 +43,7 @@ pub async fn listen<F>(socket: TcpStream, is_client_side: bool, callback: F) whe
             if frame_opt.is_some() {
                 let frame = frame_opt.clone().unwrap();
                 frame_buf.push(frame);
-                
+
                 let f = frame_opt.unwrap(); // our copy
                 rem_frames = f.n_remaining_frames as usize;
                 // println!("GOT: {:?}", frame_opt.unwrap());
@@ -140,7 +139,7 @@ pub async fn listen<F>(socket: TcpStream, is_client_side: bool, callback: F) whe
         }
 
     }
-    }
+}
 
 impl Connection {
     pub fn new(stream: TcpStream) -> Connection {

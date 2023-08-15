@@ -26,8 +26,7 @@ async fn main() {
 }
 
 async fn listen(socket: TcpStream, user_provider: UserProvider) {
-    connection::listen(socket, false, |x| {
-        println!("IM IN THE CLOSURE");
+    connection::listen(Connection::new(socket), false, |x| {
         match x {
             connection::BearcubMessage::Request { msg } => {
                 let cur_uid = msg.user_id().unwrap_or_else(|| String::new());
@@ -44,6 +43,7 @@ async fn listen(socket: TcpStream, user_provider: UserProvider) {
     }).await;
 }
 
+// Pending deprecation
 async fn process(socket: TcpStream, user_provider: UserProvider) {
     // The `Connection` lets us read/write redis **frames** instead of
     // byte streams. The `Connection` type is defined by mini-redis.

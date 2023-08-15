@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use bearcub::{say_hello, server::connection::Connection, protocol::{wire::Frame, types::{RequestMessage, ResponseMessage}}};
+use bearcub::{say_hello, server::connection::{Connection, self}, protocol::{wire::Frame, types::{RequestMessage, ResponseMessage}}};
 use bytes::Bytes;
 use tokio::{net::TcpStream, io::AsyncWriteExt};
 use anyhow::*;
@@ -13,13 +13,10 @@ async fn receive_message(mut conn: Connection) -> Result<Option<ResponseMessage>
     Ok(None)
 }
 
-#[tokio::main]
-async fn main() {
-    let mut stream = TcpStream::connect("127.0.0.1:9444").await.unwrap();
+async fn client_test(mut conn: Connection) {
+    let mut ctr: usize = 0;
 
-    // Write some data.
-    // stream.write_all(b"hello world!").await;
-    let mut conn = Connection::new(stream);
+    // Write the intitial message
     let msg = RequestMessage::Put { user_id: "beaa3a60-0082-4e5d-8153-a3c062dfdd2a".to_string(), id: "0e58d858-0808-4cef-8143-8eb4db188a64".to_string(), parent: None, data: Bytes::from("{\"title\": \"abc\"}") };
     let frames = msg.to_frames();
     for frame in &frames {
@@ -28,27 +25,32 @@ async fn main() {
             break;
         }
     }
-    // let frame = Frame::new(Some("e17ca57f-a8db-4a0d-b9a9-6ff9edc983fd".to_string()), 1 as u32, 'G' as u8, Bytes::from_static(b"abc"));
-    // conn.write_frame(&frame).await;
-    // conn.write_frame(&frame).await;
-    // let z = conn.read_frame().await.unwrap();
-    loop {
-        let read_res = conn.read_frame().await;
-        if let Some(frame) = read_res.ok() {
-            match frame {
-                Some(data) => {
-                    println!("GOT FRAME: {:?}", data);
-                },
-                None => {
-                    println!("read none frame - breaking");
-                    break;
-                },
-            }
+
+    // and listen for subsequent messages
+    connection::listen(conn, true, |x| {
+        ctr += 1;
+        println!("In client_test closure (ctr {})", ctr);
+        match x {
+            connection::BearcubMessage::Response { msg } => {
+                println!("Got msg: {:?}", &msg);
+                if ctr > 2 { None } else { Some(connection::BearcubMessage::Request { msg: RequestMessage::Put { user_id: "beaa3a60-0082-4e5d-8153-a3c062dfdd2a".to_string(), id: "0e58d858-0808-4cef-8143-8eb4db188a64".to_string(), parent: None, data: Bytes::from("{\"title\": \"abc\"}") }}) }
+            },
+            _ => None,
         }
-    }
-    /*let addr_str = "localhost:6739";
-    let addr = addr_str.parse::<SocketAddr>().unwrap();
-    let tcp_conn = TcpStream::connect(addr).await.unwrap();
-    tcp_conn.writable().await.unwrap();
-    tcp_conn.try_write(b"abc");*/
+    }).await;
+}
+
+#[tokio::main]
+async fn main() {
+    let mut stream = TcpStream::connect("127.0.0.1:9444").await.unwrap();
+    let mut conn = Connection::new(stream);
+    client_test(conn).await;
+    // let msg = RequestMessage::Put { user_id: "beaa3a60-0082-4e5d-8153-a3c062dfdd2a".to_string(), id: "0e58d858-0808-4cef-8143-8eb4db188a64".to_string(), parent: None, data: Bytes::from("{\"title\": \"abc\"}") };
+    // let frames = msg.to_frames();
+    // for frame in &frames {
+    //     let res = conn.write_frame(frame).await;
+    //     if res.is_err() {
+    //         break;
+    //     }
+    // }
 }
