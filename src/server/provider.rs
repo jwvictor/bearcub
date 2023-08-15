@@ -77,6 +77,11 @@ impl Provider {
         Ok(s)
     }
 
+    pub fn write_blob_data(&self, id: &str, contents: &[u8]) -> Result<()> {
+        std::fs::write(self.blob_filename(id), contents)?;
+        Ok(())
+    }
+
     pub fn check_root_structure(&mut self) {
         if self.skeleton.is_some() {
             return;
@@ -128,14 +133,24 @@ impl Provider {
     pub fn put_node(&mut self, id: &str, parent_id: Option<&str>, data_bytes: Bytes) -> Result<()> {
         match &mut self.skeleton {
             Some(root) => {
-                let title = extract_title(data_bytes);
+                let title = extract_title(data_bytes.clone());
                 if !title.is_ok() {
                     // println!("error extracting title: {:?}", title.unwrap_err());
                     return Err(anyhow!("no title found in data"));
                 }
                 let title_s = title.unwrap();
                 let x = root.add_node(SkeletonNode::new(id, &title_s[..]), parent_id);
-                x
+                if !x.is_ok() {
+                    return Err(anyhow!("error adding node to structure"));
+                }
+                let res1 = self.flush();
+                let bs_vec = data_bytes.to_vec();
+                let res2 = self.write_blob_data(id, &bs_vec[..]);
+                if res1.is_err() || res2.is_err() {
+                    Err(anyhow!("error writing to disk"))
+                } else {
+                    x
+                }
             },
             None => Err(anyhow!("no state loaded")),
         }
