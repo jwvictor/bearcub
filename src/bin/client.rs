@@ -1,17 +1,6 @@
-use std::net::SocketAddr;
-
-use bearcub::{say_hello, server::connection::{Connection, self}, protocol::{wire::Frame, types::{RequestMessage, ResponseMessage}}};
+use bearcub::{server::connection::{Connection, self}, protocol::types::RequestMessage};
 use bytes::Bytes;
-use tokio::{net::TcpStream, io::AsyncWriteExt};
-use anyhow::*;
-
-async fn receive_message(mut conn: Connection) -> Result<Option<ResponseMessage>> {
-
-    let mut frame_buf:Vec<Frame> = vec![];
-    let mut rem_frames: usize;
-
-    Ok(None)
-}
+use tokio::net::TcpStream;
 
 async fn client_test(mut conn: Connection) {
     let mut ctr: usize = 0;
@@ -42,15 +31,7 @@ async fn client_test(mut conn: Connection) {
 
 #[tokio::main]
 async fn main() {
-    let mut stream = TcpStream::connect("127.0.0.1:9444").await.unwrap();
-    let mut conn = Connection::new(stream);
+    let stream = TcpStream::connect("127.0.0.1:9444").await.unwrap();
+    let conn = Connection::new(stream);
     client_test(conn).await;
-    // let msg = RequestMessage::Put { user_id: "beaa3a60-0082-4e5d-8153-a3c062dfdd2a".to_string(), id: "0e58d858-0808-4cef-8143-8eb4db188a64".to_string(), parent: None, data: Bytes::from("{\"title\": \"abc\"}") };
-    // let frames = msg.to_frames();
-    // for frame in &frames {
-    //     let res = conn.write_frame(frame).await;
-    //     if res.is_err() {
-    //         break;
-    //     }
-    // }
 }

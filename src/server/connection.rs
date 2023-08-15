@@ -5,8 +5,6 @@ use anyhow::*;
 
 use crate::protocol::{types::*, wire::{Frame, check_frame, try_parse_frame}};
 
-use super::provider::UserProvider;
-
 const CXN_FIRST_BYTE_TIMEOUT_MS: u32 = 5000;
 const CXN_RECENT_BYTE_TIMEOUT_MS: u32 = 5000;
 

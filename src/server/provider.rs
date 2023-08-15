@@ -125,7 +125,7 @@ impl Provider {
         }
     }
 
-    pub fn put_node(&mut self, id: &str, parent_id: Option<&str>, mut data_bytes: Bytes) -> Result<()> {
+    pub fn put_node(&mut self, id: &str, parent_id: Option<&str>, data_bytes: Bytes) -> Result<()> {
         match &mut self.skeleton {
             Some(root) => {
                 let title = extract_title(data_bytes);

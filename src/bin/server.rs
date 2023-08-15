@@ -1,10 +1,5 @@
-
-use std::collections::HashMap;
-
-use bearcub::{server::{connection::{Connection, self}, provider::UserProvider}, protocol::{wire::Frame, types::{RequestMessage, ResponseMessage, ERR_CODE_INVALID_MSG, ERR_DESC_INVALID_MSG, ERR_CODE_NO_SUCH_ENTITY, ERR_DESC_NO_SUCH_ENTITY}}, server::provider::Provider};
+use bearcub::{server::{connection::{Connection, self}, provider::UserProvider}, protocol::types::{ResponseMessage, ERR_CODE_INVALID_MSG, ERR_DESC_INVALID_MSG, ERR_CODE_NO_SUCH_ENTITY, ERR_DESC_NO_SUCH_ENTITY}};
 use tokio::net::{TcpListener, TcpStream};
-use bytes::Bytes;
-use anyhow::*;
 
 #[tokio::main]
 async fn main() {
@@ -41,83 +36,4 @@ async fn listen(socket: TcpStream, user_provider: UserProvider) {
             _ => None,
         }
     }).await;
-}
-
-// Pending deprecation
-async fn process(socket: TcpStream, user_provider: UserProvider) {
-    // The `Connection` lets us read/write redis **frames** instead of
-    // byte streams. The `Connection` type is defined by mini-redis.
-    let mut connection = Connection::new(socket);
-    let mut frame_buf:Vec<Frame> = vec![];
-    let mut cur_uid:Option<String> = None;
-    let mut rem_frames: usize;
-
-    loop {
-        if let Some(frame_opt) = connection.read_frame().await.ok() {
-            if frame_opt.is_some() {
-                let frame = frame_opt.clone().unwrap();
-                frame_buf.push(frame);
-                
-                let f = frame_opt.unwrap(); // our copy
-                if let Some(uid) = f.user_id {
-                    cur_uid = Some(uid);
-                }
-                rem_frames = f.n_remaining_frames as usize;
-                // println!("GOT: {:?}", frame_opt.unwrap());
-                
-                if rem_frames == 1 {
-                    // This is the last frame
-                    let my_frames = frame_buf;
-                    frame_buf = vec![];
-                    let mut prov = user_provider.get(&cur_uid.clone().unwrap()).unwrap();
-                    // let _ = prov.get_skeleton_node("a"); // or whatever
-                    let this_msg = RequestMessage::from_frames(my_frames);
-                    let reply = match this_msg {
-                        Result::Ok(msg) => {
-                            println!("got message: {:?}", &msg);
-                            let response_msg = prov.respond_to(msg).unwrap_or_else(|_| ResponseMessage::Error { code: ERR_CODE_INVALID_MSG, description: ERR_DESC_INVALID_MSG.to_string() });
-                            println!("response message: {:?}", &response_msg);
-                            response_msg
-                        },
-                        _ => {
-                            // Write error back to user
-                            println!("invalid message");
-                            let resp_err = ResponseMessage::Error { code: ERR_CODE_INVALID_MSG, description: ERR_DESC_INVALID_MSG.to_string() };
-                            resp_err
-                        },
-                    };
-
-                    let frames = reply.to_frames();
-                    println!("got {} frames to write back...", frames.len());
-                    let mut write_res: Result<usize> = Err(anyhow!("no frames to write"));
-                    let mut fi: usize = 0;
-                    'inner: loop {
-                        if fi >= frames.len() {
-                            break 'inner;
-                        }
-                        let f = &frames[fi];
-                        write_res = connection.write_frame(f).await;
-                        if !write_res.is_ok() {
-                            break 'inner;
-                        }
-                        fi += 1;
-                    }
-                    match write_res {
-                        Err(_z) => {
-                            println!("client closed socket, breaking out...");
-                            break;
-                        },
-                        _ => (),
-                    }
-
-
-                }
-            } else {
-                println!("got the else case");
-                break;
-            }
-        }
-
-    }
-
 }

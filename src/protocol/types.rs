@@ -1,7 +1,5 @@
 use anyhow::anyhow;
 use bytes::{BytesMut, Bytes, BufMut, Buf};
-use std::io::Cursor;
-use tokio::io::BufWriter;
 use anyhow::*;
 use super::wire::Frame;
 
@@ -67,7 +65,6 @@ impl ResponseMessage {
                     n_frames += 1;
                 }
 
-                let data_buf = BytesMut::with_capacity(BUF_CAP);
                 let mut frames:Vec<Frame> = vec![];
                 let mut bs_remaining = data.len();
 
@@ -183,6 +180,7 @@ impl RequestMessage {
             RequestMessage::Remove{user_id, id} => {
                 // TODO - implementme
                 let mut frames = vec![];
+                frames.push(Frame::new(Some(user_id), 1, 'R' as u8, Bytes::from(id.clone())));
                 frames
             },
         }

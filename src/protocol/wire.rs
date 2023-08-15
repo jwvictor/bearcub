@@ -1,4 +1,4 @@
-use bytes::{Bytes, BytesMut, BufMut, Buf};
+use bytes::{Bytes, BytesMut, BufMut};
 use std::io::{Cursor, Read};
 
 #[derive(Debug, Clone)]
@@ -13,7 +13,7 @@ pub struct Frame {
 impl Frame {
 
     pub fn new(user_id: Option<String>, n_remaining_frames:u32, msg_type_flag:u8, data: Bytes) -> Frame {
-        let mut f = Frame{
+        let f = Frame{
             user_id,
             n_remaining_frames, 
             msg_type_flag, 
@@ -56,7 +56,7 @@ impl Frame {
 }
 
 pub fn is_user_id_required_msgtype(msg_type_flag:u8) -> bool {
-    let user_id_req:Vec<u8> = vec!['G', 'P', 'p', 's'].into_iter().map(|x| x as u8).collect();
+    let user_id_req:Vec<u8> = vec!['G', 'P', 'p', 's', 'R'].into_iter().map(|x| x as u8).collect();
     user_id_req.contains(&msg_type_flag)
 }
 
