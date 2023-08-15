@@ -104,6 +104,7 @@ pub async fn listen<F>(socket: TcpStream, is_client_side: bool, callback: F) whe
                         break;
                     }
 
+                    // Dispatch on type instead of generics also
                     let frames = match reply.unwrap() {
                         BearcubMessage::Request { msg } => msg.to_frames(),
                         BearcubMessage::Response { msg } => msg.to_frames(),

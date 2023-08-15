@@ -94,7 +94,6 @@ impl ResponseMessage {
         out.freeze()
     }
 
-    // pub fn from_frames(frames: Vec<Frame>) -> Result<RequestMessage> {
     pub fn from_frames(frames: Vec<Frame>) -> Result<ResponseMessage> {
         let mut f0 = frames[0].clone();
         match f0.msg_type_flag {
@@ -187,6 +186,16 @@ impl RequestMessage {
                 frames
             },
         }
+    }
+
+    pub fn user_id(&self) -> Option<String> {
+        let q = match &self {
+            &RequestMessage::Put { user_id, .. } => user_id.clone(),
+            &RequestMessage::Set { user_id, .. } => user_id.clone(),
+            &RequestMessage::Get { user_id, .. } => user_id.clone(),
+            &RequestMessage::Remove { user_id, .. } => user_id.clone(),
+        };
+        Some(q)
     }
 }
 
