@@ -31,7 +31,7 @@ pub enum BearcubMessage {
     },
 }
 
-pub async fn listen<F>(socket: TcpStream, callback: F) where
+pub async fn listen<F>(socket: TcpStream, is_client_side: bool, callback: F) where
     F: Fn(BearcubMessage) -> Option<BearcubMessage> {
     // The `Connection` lets us read/write redis **frames** instead of
     // byte streams. The `Connection` type is defined by mini-redis.
@@ -48,37 +48,66 @@ pub async fn listen<F>(socket: TcpStream, callback: F) where
                 let f = frame_opt.unwrap(); // our copy
                 rem_frames = f.n_remaining_frames as usize;
                 // println!("GOT: {:?}", frame_opt.unwrap());
-                
+
                 if rem_frames == 1 {
                     // This is the last frame
                     let my_frames = frame_buf;
                     frame_buf = vec![];
-                    let this_msg = RequestMessage::from_frames(my_frames);
-                    let reply = match this_msg {
-                        Result::Ok(msg) => {
-                            println!("got message: {:?}", &msg);
-                            let response_msg = callback(BearcubMessage::Request { msg }).map(|x| match x {
-                                BearcubMessage::Request { .. } => ResponseMessage::Error { code: ERR_CODE_INVALID_MSG, description: ERR_DESC_INVALID_MSG.to_string() },
-                                BearcubMessage::Response { msg } => {
-                                    msg
-                                },
-                            });
-                            println!("response message: {:?}", &response_msg);
-                            response_msg
-                        },
-                        _ => {
-                            // Write error back to user
-                            println!("invalid message");
-                            let resp_err = ResponseMessage::Error { code: ERR_CODE_INVALID_MSG, description: ERR_DESC_INVALID_MSG.to_string() };
-                            Some(resp_err)
-                        },
+                    // This could probably be done nicer with generics, but I don't feel like
+                    // dealing with it right now
+                    let reply = if !is_client_side {
+                        let this_msg = RequestMessage::from_frames(my_frames);
+                        match this_msg {
+                            Result::Ok(msg) => {
+                                println!("got message: {:?}", &msg);
+                                let response_msg = callback(BearcubMessage::Request { msg }).map(|x| match x {
+                                    BearcubMessage::Request { .. } => ResponseMessage::Error { code: ERR_CODE_INVALID_MSG, description: ERR_DESC_INVALID_MSG.to_string() },
+                                    BearcubMessage::Response { msg } => {
+                                        msg
+                                    },
+                                });
+                                println!("response message: {:?}", &response_msg);
+                                response_msg.map(|z| BearcubMessage::Response { msg: z })
+                            },
+                            _ => {
+                                // Write error back to user
+                                println!("invalid message");
+                                let resp_err = ResponseMessage::Error { code: ERR_CODE_INVALID_MSG, description: ERR_DESC_INVALID_MSG.to_string() };
+                                Some(BearcubMessage::Response { msg: resp_err })
+                            },
+                        }
+                    } else {
+                        let this_msg = ResponseMessage::from_frames(my_frames);
+                        match this_msg {
+                            Result::Ok(msg) => {
+                                println!("got message (client): {:?}", &msg);
+                                let response_msg = callback(BearcubMessage::Response { msg }).map(|x| match x {
+                                    BearcubMessage::Response { .. } => None,
+                                    BearcubMessage::Request { msg } => {
+                                        Some(msg)
+                                    },
+                                });
+                                println!("response message: {:?}", &response_msg);
+                                match response_msg {
+                                    None => None,
+                                    Some(x) => x.map(|z| BearcubMessage::Request { msg: z }),
+                                }
+                            },
+                            _ => {
+                                // Break out of everything 
+                                None
+                            },
+                        }
                     };
 
                     if reply.is_none() {
                         break;
                     }
 
-                    let frames = reply.unwrap().to_frames();
+                    let frames = match reply.unwrap() {
+                        BearcubMessage::Request { msg } => msg.to_frames(),
+                        BearcubMessage::Response { msg } => msg.to_frames(),
+                    };
                     println!("got {} frames to write back...", frames.len());
                     let mut write_res: Result<usize> = Err(anyhow!("no frames to write"));
                     let mut fi: usize = 0;
@@ -110,7 +139,7 @@ pub async fn listen<F>(socket: TcpStream, callback: F) where
         }
 
     }
-}
+    }
 
 impl Connection {
     pub fn new(stream: TcpStream) -> Connection {

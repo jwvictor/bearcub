@@ -55,7 +55,10 @@ impl ResponseMessage {
     pub fn to_frames(mut self) -> Vec<Frame> {
         match &mut self {
             ResponseMessage::Error{code, description} => {
-                vec![]
+                let mut buf = BytesMut::with_capacity(4 + description.len());
+                buf.put_u32(*code);
+                buf.put_slice(description.as_bytes());
+                vec![Frame::new(None, 1, 'e' as u8, buf.freeze())]
             },
             Self::Data{data} => {
                 let bytes_per_frame = DATA_BYTES_PER_FRAME;
@@ -79,6 +82,24 @@ impl ResponseMessage {
                 }
                 frames
             },
+        }
+    }
+
+    // pub fn from_frames(frames: Vec<Frame>) -> Result<RequestMessage> {
+    pub fn from_frames(frames: Vec<Frame>) -> Result<ResponseMessage> {
+        let mut f0 = frames[0].clone();
+        match f0.msg_type_flag {
+            b'd' => {
+                Ok(ResponseMessage::Error { code: 0, description: "".to_string() })
+            },
+            b'e' => {
+                // error
+                let mut rig = f0.data.split_to(4);
+                let code = rig.get_u32();
+                let desc:Vec<u8> = f0.data.to_vec();
+                Ok(ResponseMessage::Error { code, description: String::from_utf8(desc).unwrap_or(String::from("unknown error")) })
+            },
+            _ => Err(anyhow!("invalid msg type flag")),
         }
     }
 }
@@ -268,6 +289,24 @@ mod tests {
             let s = String::from_utf8(frame2.data.to_vec()).unwrap();
             assert!(s.eq("hello"));
         }
+    }
+
+    #[test]
+    fn test_error_frames() {
+        let small_data = "hello";
+        let msg = ResponseMessage::Error { code: 128, description: String::from(small_data) };
+        let frames = msg.to_frames();
+        assert_eq!(frames.len(), 1);
+
+        let res_msg = ResponseMessage::from_frames(frames).unwrap();
+        println!("resmsg = {:?}", &res_msg);
+        let b = match res_msg {
+            ResponseMessage::Error { code, description } => {
+                (code == 128) && (description.eq("hello"))
+            },
+            _ => false
+        };
+        assert!(b);
     }
 
 }
