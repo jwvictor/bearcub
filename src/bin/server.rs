@@ -29,7 +29,10 @@ async fn listen(socket: TcpStream, user_provider: UserProvider) {
                 if prov.is_err() {
                     Some(connection::BearcubMessage::Response { msg: ResponseMessage::Error { code: ERR_CODE_NO_SUCH_ENTITY, description: ERR_DESC_NO_SUCH_ENTITY.to_string() } })
                 } else {
-                    let res_msg = prov.unwrap().respond_to(msg).unwrap_or_else(|_| ResponseMessage::Error { code: ERR_CODE_INVALID_MSG, description: ERR_DESC_INVALID_MSG.to_string() });
+                    let res_msg = prov.unwrap().respond_to(msg).unwrap_or_else(|e| { 
+                        println!("Got error processing message: {:?}", e);
+                        ResponseMessage::Error { code: ERR_CODE_INVALID_MSG, description: ERR_DESC_INVALID_MSG.to_string() } 
+                    });
                     Some(connection::BearcubMessage::Response { msg: res_msg })
                 }
             },

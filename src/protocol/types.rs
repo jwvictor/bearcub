@@ -338,6 +338,17 @@ mod tests {
 
 
     #[test]
+    fn test_set_frames() {
+        let msg = RequestMessage::Set { user_id: "2ab3da63-e24f-47e2-9b56-f3d19fade0cf".to_string(), id: "2ab3da63-e24f-47e2-9b56-f3d19fade0ce".to_string(), data: Bytes::from("{\"title\": \"abcdef\"}") };
+        let frames = msg.to_frames();
+        let req_msg = RequestMessage::from_frames(frames).unwrap();
+        let b = match req_msg {
+            // ...
+        }
+
+    }
+
+    #[test]
     fn test_data_frames_big() {
         let mut big_data = BytesMut::with_capacity(BUF_CAP*4);
         for _i in 0..(BUF_CAP*4) { 

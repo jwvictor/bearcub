@@ -22,11 +22,16 @@ async fn client_test(mut conn: Connection) {
         match x {
             connection::BearcubMessage::Response { msg } => {
                 println!("Got msg from server: {:?}", &msg);
-                if ctr > 2 { 
+                if ctr > 3 { 
                     None 
-                } else if ctr == 1 { 
+                } else if ctr == 3 { 
+                    println!("\t DOING REQ PATH");
                     Some(connection::BearcubMessage::Request { msg: RequestMessage::Get { user_id: "beaa3a60-0082-4e5d-8153-a3c062dfdd2a".to_string(), path: Some("abc".to_string()), id: None }}) 
+                } else if ctr == 2 {
+                    println!("\t DOING SET");
+                    Some(connection::BearcubMessage::Request { msg: RequestMessage::Set { user_id: "beaa3a60-0082-4e5d-8153-a3c062dfdd2a".to_string(), id: "0e58d858-0808-4cef-8143-8eb4db188a64".to_string(), data: Bytes::from("{\"title\": \"def\"}") }}) 
                 } else { 
+                    println!("\t DOING REQ ID");
                     Some(connection::BearcubMessage::Request { msg: RequestMessage::Get { user_id: "beaa3a60-0082-4e5d-8153-a3c062dfdd2a".to_string(), id: Some("0e58d858-0808-4cef-8143-8eb4db188a64".to_string()), path: None }}) 
                 }
             },

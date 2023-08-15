@@ -141,8 +141,10 @@ impl Provider {
                 let title_s = title.unwrap();
                 let res1 = root.set_node(SkeletonNode::new(id, &title_s));
                 if res1.is_err() {
+                    println!("unable to set_node");
                     Err(anyhow!("unable to add node to structure"))
                 } else {
+                    println!("writing blob data for {:?}", &id);
                     self.write_blob_data(id, &data_bytes.to_vec()[..])
                 }
             },
@@ -209,6 +211,11 @@ impl Provider {
                     Ok(ResponseMessage::Error { code: ERR_CODE_INVALID_MSG, description: ERR_DESC_INVALID_MSG.to_string() })
                 }
             },
+            RequestMessage::Set { user_id: _, id, data } => {
+                println!("Responding to set: {:?}", id.clone());
+                self.set_node(&id[..], data)?;
+                Ok(ResponseMessage::Data { data: Bytes::from("SUCCESS") })
+            }
             _ => Ok(ResponseMessage::Error { code: ERR_CODE_INVALID_MSG, description: ERR_DESC_INVALID_MSG.to_string() }),
         }
 
