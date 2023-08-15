@@ -85,12 +85,21 @@ impl ResponseMessage {
         }
     }
 
+    fn from_frames_data(frames: Vec<Frame>) -> Bytes {
+        let mut out = BytesMut::with_capacity(BUF_CAP*frames.len());
+        for f in frames {
+            let bs = f.data.to_vec();
+            out.put_slice(&bs[..]);
+        }
+        out.freeze()
+    }
+
     // pub fn from_frames(frames: Vec<Frame>) -> Result<RequestMessage> {
     pub fn from_frames(frames: Vec<Frame>) -> Result<ResponseMessage> {
         let mut f0 = frames[0].clone();
         match f0.msg_type_flag {
             b'd' => {
-                Ok(ResponseMessage::Error { code: 0, description: "".to_string() })
+                Ok(ResponseMessage::Data { data: Self::from_frames_data(frames) })
             },
             b'e' => {
                 // error
@@ -289,6 +298,17 @@ mod tests {
             let s = String::from_utf8(frame2.data.to_vec()).unwrap();
             assert!(s.eq("hello"));
         }
+
+        let res_msg = ResponseMessage::from_frames(frames).unwrap();
+        println!("resmsg = {:?}", &res_msg);
+        let b = match res_msg {
+            ResponseMessage::Data { data }=> {
+                let dats = String::from_utf8(data.to_vec()).unwrap();
+                dats.eq("hello")
+            },
+            _ => false
+        };
+        assert!(b);
     }
 
     #[test]
@@ -303,6 +323,29 @@ mod tests {
         let b = match res_msg {
             ResponseMessage::Error { code, description } => {
                 (code == 128) && (description.eq("hello"))
+            },
+            _ => false
+        };
+        assert!(b);
+    }
+
+
+    #[test]
+    fn test_data_frames_big() {
+        let mut big_data = BytesMut::with_capacity(BUF_CAP*4);
+        for _i in 0..(BUF_CAP*4) { 
+            big_data.put_u8(3 as u8);
+        }
+        let msg = ResponseMessage::Data { data: big_data.freeze() };
+        let frames = msg.to_frames();
+        assert_eq!(frames.len(), 5);
+
+        let res_msg = ResponseMessage::from_frames(frames).unwrap();
+        println!("resmsg = {:?}", &res_msg);
+        let b = match res_msg {
+            ResponseMessage::Data { data } => {
+                let bs = data.to_vec();
+                bs.len() == (BUF_CAP*4) && bs.iter().map(|x| *x == (3 as u8)).reduce(|x,y| x && y).unwrap_or(false)
             },
             _ => false
         };
