@@ -130,6 +130,26 @@ impl Provider {
         }
     }
 
+    pub fn set_node(&mut self, id: &str, data_bytes: Bytes) -> Result<()> {
+        match &mut self.skeleton {
+            Some(root) => {
+                let title = extract_title(data_bytes.clone());
+                if !title.is_ok() {
+                    // println!("error extracting title: {:?}", title.unwrap_err());
+                    return Err(anyhow!("no title found in data"));
+                }
+                let title_s = title.unwrap();
+                let res1 = root.set_node(SkeletonNode::new(id, &title_s));
+                if res1.is_err() {
+                    Err(anyhow!("unable to add node to structure"))
+                } else {
+                    self.write_blob_data(id, &data_bytes.to_vec()[..])
+                }
+            },
+            _ => Err(anyhow!("no state loaded")),
+        }
+    }
+
     pub fn put_node(&mut self, id: &str, parent_id: Option<&str>, data_bytes: Bytes) -> Result<()> {
         match &mut self.skeleton {
             Some(root) => {

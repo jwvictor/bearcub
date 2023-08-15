@@ -51,6 +51,11 @@ impl SkeletonHandle {
         }
     }
 
+    pub fn set_node(&mut self, node: SkeletonNode) -> Result<()> {
+        let _ = self.nodes.insert(node.id.clone(), node);
+        Ok(())
+    }
+
     pub fn add_node(&mut self, node: SkeletonNode, parent: Option<&str>) -> Result<()> {
         match parent {
             Some(pid) => {
@@ -130,6 +135,12 @@ impl SkeletonHandleRef {
 
     pub fn get_by_path(&self, id: &str) -> Option<SkeletonNode> {
         self.ptr.lock().unwrap().borrow().get_by_path(id)
+    }
+
+    pub fn set_node(&mut self, node: SkeletonNode) -> Result<()> {
+        let guard = self.ptr.lock().unwrap();
+        let mut borrow = guard.borrow_mut();
+        borrow.set_node(node)
     }
 
     pub fn add_node(&mut self, node: SkeletonNode, parent: Option<&str>) -> Result<()> {
