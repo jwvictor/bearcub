@@ -1,4 +1,4 @@
-use bytes::{Bytes, BytesMut, BufMut};
+use bytes::{Bytes, BytesMut, BufMut, Buf};
 use std::io::{Cursor, Read};
 
 #[derive(Debug, Clone)]

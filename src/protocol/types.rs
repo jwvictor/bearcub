@@ -131,8 +131,30 @@ impl RequestMessage {
         }
     }
 
+    fn from_frames_put_set(frames: Vec<Frame>, is_set: bool) -> Result<RequestMessage> {
+        let mut data = BytesMut::with_capacity(frames.len() * BUF_CAP);
+        let mut f0 = frames[0].clone();
+        let id_bytes = f0.data.split_to(36);
+        let pid_bytes = if !is_set { Some(f0.data.split_to(36)) } else { None };
+        let id_s = String::from_utf8(id_bytes.to_vec()).unwrap_or_else(|_| String::new());
+        // TODO: restructure this hideous thing
+        let pid_opt = if pid_bytes.is_none() { None } else { if pid_bytes.clone().unwrap().to_vec().iter().map(|x| *x != 0 as u8).reduce(|x,y| x || y).unwrap_or(false) { Some(String::from_utf8(pid_bytes.unwrap().to_vec()).ok().unwrap_or_else(|| String::new())) } else { None } };
+        data.put(f0.data.split_to(f0.data.len()));
+        for i in 1..frames.len() {
+            data.put(frames[i].data.clone());
+        }
+        let fmsg = if !is_set { 
+            RequestMessage::Put { user_id: f0.user_id.unwrap_or_else(|| String::new()), id: id_s, parent: pid_opt, data: data.freeze() } 
+        } else {
+            RequestMessage::Set { user_id: f0.user_id.unwrap_or_else(|| String::new()), id: id_s, data: data.freeze() }
+        };
+        Ok(fmsg)
+    }
+
+    fn from_frames_set(frames: Vec<Frame>) -> Result<RequestMessage> {
+        Self::from_frames_put_set(frames, true)
+    }
     fn from_frames_put(frames: Vec<Frame>) -> Result<RequestMessage> {
-        // the bytes are just the ID
         let mut data = BytesMut::with_capacity(frames.len() * BUF_CAP);
         let mut f0 = frames[0].clone();
         let id_bytes = f0.data.split_to(36);
@@ -152,6 +174,7 @@ impl RequestMessage {
             b'G' => RequestMessage::from_frames_getbyid(f0),
             b'P' => RequestMessage::from_frames_getbypath(f0),
             b'p' => RequestMessage::from_frames_put(frames),
+            b's' => RequestMessage::from_frames_set(frames),
             _ => Err(anyhow!("invalid msg_type_flag")),
         }
     }
@@ -170,10 +193,10 @@ impl RequestMessage {
                 frames
             },
             RequestMessage::Put{user_id, id, parent, data} => {
-                put_set_frames(user_id, 'p' as u8, id, parent, data)
+                put_set_frames(user_id, 'p' as u8, id, parent, false, data)
             },
             RequestMessage::Set{user_id, id, data} => {
-                let frames = put_set_frames(user_id, 's' as u8, id, None, data);
+                let frames = put_set_frames(user_id, 's' as u8, id, None, true, data);
                 // println!("set frames: {:?}\n", frames);
                 frames
             },
@@ -197,7 +220,7 @@ impl RequestMessage {
     }
 }
 
-fn put_set_frames(user_id: String, msg_typ_code: u8, id: String, parent: Option<String>, blob_data: Bytes) -> Vec<Frame> {
+fn put_set_frames(user_id: String, msg_typ_code: u8, id: String, parent: Option<String>, is_set: bool, blob_data: Bytes) -> Vec<Frame> {
     let mut frames = vec![];
     let fr_sz = DATA_BYTES_PER_FRAME;
     let mut buf = BytesMut::with_capacity(blob_data.len() + 36 + 36);
@@ -205,9 +228,12 @@ fn put_set_frames(user_id: String, msg_typ_code: u8, id: String, parent: Option<
     if let Some(pid) = parent {
         buf.put_slice(pid.as_bytes());
     } else {
-        // do nothing
-        for _ in 0..36 {
-            buf.put_u8(0 as u8);
+        if !is_set {
+            // only print the null uuid if this is a put
+            for _ in 0..36 {
+                buf.put_u8(0 as u8);
+            }
+
         }
     }
     buf.put(blob_data);
@@ -237,6 +263,8 @@ fn put_set_frames(user_id: String, msg_typ_code: u8, id: String, parent: Option<
 
 #[cfg(test)]
 mod tests {
+    use std::io::Cursor;
+
     use crate::protocol::wire::try_parse_frame;
 
     // Note this useful idiom: importing names from outer (for mod tests) scope.
@@ -341,11 +369,25 @@ mod tests {
     fn test_set_frames() {
         let msg = RequestMessage::Set { user_id: "2ab3da63-e24f-47e2-9b56-f3d19fade0cf".to_string(), id: "2ab3da63-e24f-47e2-9b56-f3d19fade0ce".to_string(), data: Bytes::from("{\"title\": \"abcdef\"}") };
         let frames = msg.to_frames();
-        let req_msg = RequestMessage::from_frames(frames).unwrap();
-        let b = match req_msg {
-            // ...
+        println!("frame 0: {:?}", &frames[0]);
+        let req_msg_res = RequestMessage::from_frames(frames);
+        if req_msg_res.is_err() {
+            println!("error = {:?}", req_msg_res.unwrap_err());
+            panic!("error");
         }
-
+        let req_msg = req_msg_res.unwrap();
+        println!("req_msg: {:?}", req_msg);
+        let b = match req_msg {
+            RequestMessage::Set { user_id, id, data } => {
+                let b1 = user_id.eq("2ab3da63-e24f-47e2-9b56-f3d19fade0cf");
+                let b2 = id.eq("2ab3da63-e24f-47e2-9b56-f3d19fade0ce");
+                let b3 = String::from_utf8(data.to_vec()).unwrap().eq("{\"title\": \"abcdef\"}");
+                println!("bools {} {} {}", b1, b2, b3);
+                b1 && b2 && b3
+            },
+            _ => false,
+        };
+        assert!(b);
     }
 
     #[test]
