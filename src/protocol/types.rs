@@ -364,6 +364,31 @@ mod tests {
         assert!(b);
     }
 
+    #[test]
+    fn test_put_frames() {
+        let msg = RequestMessage::Put { user_id: "2ab3da63-e24f-47e2-9b56-f3d19fade0cf".to_string(), parent: None, id: "2ab3da63-e24f-47e2-9b56-f3d19fade0ce".to_string(), data: Bytes::from("{\"title\": \"abcdef\"}") };
+        let frames = msg.to_frames();
+        println!("frame 0: {:?}", &frames[0]);
+        let req_msg_res = RequestMessage::from_frames(frames);
+        if req_msg_res.is_err() {
+            println!("error = {:?}", req_msg_res.unwrap_err());
+            panic!("error");
+        }
+        let req_msg = req_msg_res.unwrap();
+        println!("req_msg: {:?}", req_msg);
+        let b = match req_msg {
+            RequestMessage::Put { user_id, id, data, parent } => {
+                let b1 = user_id.eq("2ab3da63-e24f-47e2-9b56-f3d19fade0cf");
+                let b2 = id.eq("2ab3da63-e24f-47e2-9b56-f3d19fade0ce");
+                let b3 = String::from_utf8(data.to_vec()).unwrap().eq("{\"title\": \"abcdef\"}");
+                let b4 = parent.is_none();
+                println!("bools {} {} {} {}", b1, b2, b3, b4);
+                b1 && b2 && b3 && b4
+            },
+            _ => false,
+        };
+        assert!(b);
+    }
 
     #[test]
     fn test_set_frames() {
