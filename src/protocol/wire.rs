@@ -1,4 +1,4 @@
-use bytes::{Bytes, BytesMut, BufMut, Buf};
+use bytes::{Bytes, BytesMut, BufMut};
 use std::io::{Cursor, Read};
 
 #[derive(Debug, Clone)]
@@ -129,6 +129,7 @@ pub fn try_parse_frame(buf: &mut Cursor<&[u8]>, buf_len: usize) -> Option<Frame>
 mod tests {
     // Note this useful idiom: importing names from outer (for mod tests) scope.
     use super::*;
+    use bytes::Buf;
 
     #[test]
     fn test_frame_deserialization() {
