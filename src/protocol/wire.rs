@@ -161,7 +161,7 @@ mod tests {
         let mut bs = f.to_bytes();
         
         let mut v_bs = bs.split_to(4);
-        let mut v_str = String::from_utf8(v_bs.to_vec()).unwrap();
+        let v_str = String::from_utf8(v_bs.to_vec()).unwrap();
         assert_eq!(v_str.eq("c0.1"), true);
 
         v_bs = bs.split_to(4);

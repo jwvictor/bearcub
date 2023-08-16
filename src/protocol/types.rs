@@ -27,6 +27,10 @@ pub enum RequestMessage {
         user_id: String,
         id: String,
     },
+    List {
+        user_id: String,
+        blob_id: Option<String>,
+    },
 }
 
 #[derive(Debug)]
@@ -151,6 +155,18 @@ impl RequestMessage {
         Ok(fmsg)
     }
 
+    fn from_frames_list(frames: Vec<Frame>) -> Result<RequestMessage> {
+        let f = frames[0].clone();
+        if f.user_id.is_none() {
+            return Err(anyhow!("invalid request"));
+        }
+        let uid = f.user_id.unwrap();
+        let id_bs:Vec<u8> = f.data.to_vec();
+        let id_empty = id_bs.iter().map(|x| *x == (0 as u8)).reduce(|x,y| x && y).unwrap_or(true);
+        let id_val = if id_empty { None } else { Some(String::from_utf8(id_bs).unwrap())};
+        Ok(RequestMessage::List { user_id: uid, blob_id: id_val })
+    }
+
     fn from_frames_set(frames: Vec<Frame>) -> Result<RequestMessage> {
         Self::from_frames_put_set(frames, true)
     }
@@ -165,7 +181,8 @@ impl RequestMessage {
             b'P' => RequestMessage::from_frames_getbypath(f0),
             b'p' => RequestMessage::from_frames_put(frames),
             b's' => RequestMessage::from_frames_set(frames),
-            b'R' => unimplemented!(),
+            b'r' => unimplemented!(),
+            b'L' => RequestMessage::from_frames_list(frames),
             _ => Err(anyhow!("invalid msg_type_flag")),
         }
     }
@@ -192,10 +209,20 @@ impl RequestMessage {
                 frames
             },
             RequestMessage::Remove{user_id, id} => {
-                // TODO - implementme
                 let mut frames = vec![];
-                frames.push(Frame::new(Some(user_id), 1, 'R' as u8, Bytes::from(id.clone())));
+                frames.push(Frame::new(Some(user_id), 1, 'r' as u8, Bytes::from(id.clone())));
                 frames
+            },
+            RequestMessage::List { user_id, blob_id } => {
+                let mut frames = vec![];
+                let empty_id: Vec<u8> = [0 as u8; 36].to_vec();
+                let id = match blob_id {
+                    None =>  empty_id,
+                    Some(bid) => bid.as_bytes().to_vec(),
+                };
+                frames.push(Frame::new(Some(user_id), 1, 'L' as u8, Bytes::from(id)));
+                frames
+
             },
         }
     }
@@ -205,6 +232,7 @@ impl RequestMessage {
             &RequestMessage::Put { user_id, .. } => user_id.clone(),
             &RequestMessage::Set { user_id, .. } => user_id.clone(),
             &RequestMessage::Get { user_id, .. } => user_id.clone(),
+            &RequestMessage::List { user_id, .. } => user_id.clone(),
             &RequestMessage::Remove { user_id, .. } => user_id.clone(),
         };
         Some(q)
@@ -275,7 +303,7 @@ mod tests {
     fn test_set_large_msg() {
         let id_str = String::from("2ab3da63-e24f-47e2-9b56-f3d19fade0cf");
         let mut data_buf = BytesMut::with_capacity(BUF_CAP*2);
-        for i in 0..(BUF_CAP*2) {
+        for _i in 0..(BUF_CAP*2) {
             data_buf.put_u8(3 as u8);
         }
         let msg = RequestMessage::Set {user_id: "2ab3da63-e24f-47e2-9b56-f3d19fade0cf".to_string(),  id: id_str.clone(), data: data_buf.freeze() };
@@ -381,6 +409,29 @@ mod tests {
         assert!(b);
     }
 
+    #[test]
+    fn test_list_frames() {
+        let msg = RequestMessage::List { user_id: "2ab3da63-e24f-47e2-9b56-f3d19fade0cf".to_string(), blob_id: Some("2ab3da63-e24f-47e2-9b56-f3d19fade0ce".to_string()) };
+        let frames = msg.to_frames();
+        println!("frame 0: {:?}", &frames[0]);
+        let req_msg_res = RequestMessage::from_frames(frames);
+        if req_msg_res.is_err() {
+            println!("error = {:?}", req_msg_res.unwrap_err());
+            panic!("error");
+        }
+        let req_msg = req_msg_res.unwrap();
+        println!("req_msg: {:?}", req_msg);
+        let b = match req_msg {
+            RequestMessage::List { user_id, blob_id } => {
+                let b1 = user_id.eq("2ab3da63-e24f-47e2-9b56-f3d19fade0cf");
+                let b2 = blob_id.unwrap().eq("2ab3da63-e24f-47e2-9b56-f3d19fade0ce");
+                println!("bools {} {}", b1, b2);
+                b1 && b2
+            },
+            _ => false,
+        };
+        assert!(b);
+    }
     #[test]
     fn test_set_frames() {
         let msg = RequestMessage::Set { user_id: "2ab3da63-e24f-47e2-9b56-f3d19fade0cf".to_string(), id: "2ab3da63-e24f-47e2-9b56-f3d19fade0ce".to_string(), data: Bytes::from("{\"title\": \"abcdef\"}") };
