@@ -165,6 +165,7 @@ impl RequestMessage {
             b'P' => RequestMessage::from_frames_getbypath(f0),
             b'p' => RequestMessage::from_frames_put(frames),
             b's' => RequestMessage::from_frames_set(frames),
+            b'R' => unimplemented!(),
             _ => Err(anyhow!("invalid msg_type_flag")),
         }
     }
