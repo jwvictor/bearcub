@@ -155,17 +155,7 @@ impl RequestMessage {
         Self::from_frames_put_set(frames, true)
     }
     fn from_frames_put(frames: Vec<Frame>) -> Result<RequestMessage> {
-        let mut data = BytesMut::with_capacity(frames.len() * BUF_CAP);
-        let mut f0 = frames[0].clone();
-        let id_bytes = f0.data.split_to(36);
-        let pid_bytes = f0.data.split_to(36);
-        let id_s = String::from_utf8(id_bytes.to_vec()).unwrap_or_else(|_| String::new());
-        let pid_opt = if pid_bytes.to_vec().iter().map(|x| *x != 0 as u8).reduce(|x,y| x || y).unwrap_or(false) { Some(String::from_utf8(pid_bytes.to_vec()).ok().unwrap_or_else(|| String::new())) } else { None };
-        data.put(f0.data.split_to(f0.data.len()));
-        for i in 1..frames.len() {
-            data.put(frames[i].data.clone());
-        }
-        Ok(RequestMessage::Put { user_id: f0.user_id.unwrap_or_else(|| String::new()), id: id_s, parent: pid_opt, data: data.freeze() })
+        Self::from_frames_put_set(frames, false)
     }
 
     pub fn from_frames(frames: Vec<Frame>) -> Result<RequestMessage> {
