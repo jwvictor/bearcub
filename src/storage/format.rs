@@ -210,8 +210,18 @@ impl SkeletonNode {
     pub fn new(id: &str, title: &str) -> SkeletonNode {
         SkeletonNode { id: id.to_string(), title: title.to_string(), child_ids: vec![] }
     }
+    pub fn has_child(&self, id: &str) -> bool {
+        for f in &self.child_ids {
+            if f.eq(id) {
+                return true;
+            }
+        }
+        return false;
+    }
     pub fn add_child(&mut self, id: &str) {
-        self.child_ids.push(id.to_string())
+        if !self.has_child(id) {
+            self.child_ids.push(id.to_string())
+        }
     }
     pub fn id(&self) -> &str {
         &self.id[..]

@@ -22,9 +22,12 @@ async fn client_test(mut conn: Connection) {
         match x {
             connection::BearcubMessage::Response { msg } => {
                 println!("Got msg from server: {:?}", &msg);
-                if ctr > 4 {
+                if ctr > 5 {
                     // Hang up
                     None 
+                } else if ctr == 5 { 
+                    println!("\t DOING LIST");
+                    Some(connection::BearcubMessage::Request { msg: RequestMessage::List { user_id: "beaa3a60-0082-4e5d-8153-a3c062dfdd2a".to_string(), blob_id: None }}) 
                 } else if ctr == 4 { 
                     println!("\t DOING REQ PATH - CORRECT TITLE");
                     Some(connection::BearcubMessage::Request { msg: RequestMessage::Get { user_id: "beaa3a60-0082-4e5d-8153-a3c062dfdd2a".to_string(), path: Some("def".to_string()), id: None }}) 

@@ -408,6 +408,30 @@ mod tests {
     }
 
     #[test]
+    fn test_list_root_frames() {
+        let msg = RequestMessage::List { user_id: "2ab3da63-e24f-47e2-9b56-f3d19fade0cf".to_string(), blob_id: None };
+        let frames = msg.to_frames();
+        println!("frame 0: {:?}", &frames[0]);
+        let req_msg_res = RequestMessage::from_frames(frames);
+        if req_msg_res.is_err() {
+            println!("error = {:?}", req_msg_res.unwrap_err());
+            panic!("error");
+        }
+        let req_msg = req_msg_res.unwrap();
+        println!("req_msg: {:?}", req_msg);
+        let b = match req_msg {
+            RequestMessage::List { user_id, blob_id } => {
+                let b1 = user_id.eq("2ab3da63-e24f-47e2-9b56-f3d19fade0cf");
+                let b2 = blob_id.is_none();
+                println!("bools {} {}", b1, b2);
+                b1 && b2
+            },
+            _ => false,
+        };
+        assert!(b);
+    }
+
+    #[test]
     fn test_list_frames() {
         let msg = RequestMessage::List { user_id: "2ab3da63-e24f-47e2-9b56-f3d19fade0cf".to_string(), blob_id: Some("2ab3da63-e24f-47e2-9b56-f3d19fade0ce".to_string()) };
         let frames = msg.to_frames();
@@ -430,6 +454,7 @@ mod tests {
         };
         assert!(b);
     }
+
     #[test]
     fn test_set_frames() {
         let msg = RequestMessage::Set { user_id: "2ab3da63-e24f-47e2-9b56-f3d19fade0cf".to_string(), id: "2ab3da63-e24f-47e2-9b56-f3d19fade0ce".to_string(), data: Bytes::from("{\"title\": \"abcdef\"}") };

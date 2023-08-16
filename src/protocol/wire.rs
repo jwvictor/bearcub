@@ -56,7 +56,7 @@ impl Frame {
 }
 
 pub fn is_user_id_required_msgtype(msg_type_flag:u8) -> bool {
-    let user_id_req:Vec<u8> = vec!['G', 'P', 'p', 's', 'R'].into_iter().map(|x| x as u8).collect();
+    let user_id_req:Vec<u8> = vec!['G', 'L', 'P', 'p', 's', 'R'].into_iter().map(|x| x as u8).collect();
     user_id_req.contains(&msg_type_flag)
 }
 
@@ -91,8 +91,12 @@ pub fn try_parse_frame(buf: &mut Cursor<&[u8]>, buf_len: usize) -> Option<Frame>
         let mut sz4:[u8; 4] = [0; 4];
         buf.read_exact(&mut sz4).ok();
         let version_string = String::from_utf8(sz4.to_vec());
-        if !version_string.unwrap_or_default().eq("c0.1") {
-            println!("bad v string");
+        let bvs = version_string.clone().unwrap_or_default();
+        if !bvs.eq("c0.1") {
+            // let mut buf2 = buf.clone();
+            // let mut s2 = String::new();
+            // buf2.read_to_string(&mut s2);
+            // println!("bad v string: {:?} / {:?} / {:?}", sz4, version_string.clone().unwrap_or_default(), s2);
             return None
         }
         
