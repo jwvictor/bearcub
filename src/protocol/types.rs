@@ -3,8 +3,6 @@ use bytes::{BytesMut, Bytes, BufMut, Buf};
 use anyhow::*;
 use super::wire::Frame;
 
-// TODO: implement protocol stuff for `user_id` field
-
 #[derive(Debug)]
 pub enum RequestMessage {
     Get {

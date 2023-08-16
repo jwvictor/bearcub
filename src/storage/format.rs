@@ -1,5 +1,6 @@
 
 use serde::{Serialize, Deserialize};
+use bytes::Bytes;
 use anyhow::*;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -37,7 +38,7 @@ pub struct SkeletonHandleRef {
 impl SkeletonHandle {
     pub fn new() -> SkeletonHandle {
         let root = SkeletonNode { id: ROOT_ID.to_string(), title: ROOT_ID.to_string(), child_ids: vec![] };
-        SkeletonHandle { root: root, nodes: HashMap::new() }
+        SkeletonHandle { root, nodes: HashMap::new() }
     }
 
     pub fn get(&self, id: &str) -> Option<SkeletonNode> {
@@ -54,6 +55,43 @@ impl SkeletonHandle {
     pub fn set_node(&mut self, node: SkeletonNode) -> Result<()> {
         let _ = self.nodes.insert(node.id.clone(), node);
         Ok(())
+    }
+
+    pub fn to_listing_json(&self, start_at: Option<&str>) ->  Result<serde_json::Value> {
+        let get_res = match start_at {
+            Some(sa) => self.get(sa),
+            None => Some(self.root.clone()),
+        };
+        if get_res.is_none() {
+            return Err(anyhow!("no such node"));
+        }
+        let blob = get_res.unwrap();
+        let children_res:Vec<Result<serde_json::Value>> = blob.child_ids.iter().map(|id| self.to_listing_json(Some(id))).collect();
+        let mut child_vals: Vec<serde_json::Value> = vec![];
+        for c in children_res {
+            if c.is_err() {
+                return Err(anyhow!("could not create listing for child"));
+            } else {
+                child_vals.push(c.unwrap());
+            }
+        }
+        let v = serde_json::json!({"id": blob.id, "title": blob.title, "children": child_vals});
+        Ok(v)
+    }
+
+    pub fn to_listing_bytes(&self, start_at: Option<&str>) -> Result<Bytes> {
+        match self.to_listing_json(start_at) {
+            Result::Err(z) => Err(z),
+            Result::Ok(x) => {
+                let s = serde_json::to_string(&x);
+                match s {
+                    Result::Err(z) => Err(z.into()),
+                    Result::Ok(json_str) => {
+                        Ok(Bytes::from(json_str))
+                    },
+                }
+            },
+        }
     }
 
     pub fn add_node(&mut self, node: SkeletonNode, parent: Option<&str>) -> Result<()> {
@@ -147,6 +185,10 @@ impl SkeletonHandleRef {
         let guard = self.ptr.lock().unwrap();
         let mut borrow = guard.borrow_mut();
         borrow.add_node(node, parent)
+    }
+
+    pub fn to_listing_bytes(&self, start_at: Option<&str>) -> Result<Bytes> {
+        self.ptr.lock().unwrap().borrow().to_listing_bytes(start_at)
     }
 
     pub fn flush_to_file(&self, path: &str) -> Result<()> {

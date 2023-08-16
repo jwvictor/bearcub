@@ -130,6 +130,26 @@ impl Provider {
         }
     }
 
+    pub fn get_skeleton(&self, blob_id: Option<String>) -> Result<Bytes> {
+        match &self.skeleton {
+            Some(root) => {
+                let z = match blob_id {
+                    Some(bid) => {
+                        let x = root.to_listing_bytes(Some(&bid[..]));
+                        if x.is_err() {
+                            Err(anyhow!("could not get listing"))
+                        } else {
+                            Ok(x.unwrap())
+                        }
+                    },
+                    None => root.to_listing_bytes(None),
+                };
+                z
+            },
+            None => Err(anyhow!("state not init'd")),
+        }
+    }
+
     pub fn set_node(&mut self, id: &str, data_bytes: Bytes) -> Result<()> {
         match &mut self.skeleton {
             Some(root) => {
@@ -212,10 +232,15 @@ impl Provider {
                 }
             },
             RequestMessage::Set { user_id: _, id, data } => {
-                println!("Responding to set: {:?}", id.clone());
                 self.set_node(&id[..], data)?;
                 Ok(ResponseMessage::Data { data: Bytes::from("SUCCESS") })
-            }
+            },
+            RequestMessage::List { user_id: _, blob_id } => {
+                match self.get_skeleton(blob_id) {
+                    Result::Ok(s) => Ok(ResponseMessage::Data { data: s }),
+                    _ => Err(anyhow!("could not get listing")),
+                }
+            },
             _ => Ok(ResponseMessage::Error { code: ERR_CODE_INVALID_MSG, description: ERR_DESC_INVALID_MSG.to_string() }),
         }
 
