@@ -1,6 +1,19 @@
 use bearcub::{server::connection::{Connection, self}, protocol::types::RequestMessage};
 use bytes::Bytes;
 use tokio::net::TcpStream;
+use uuid::Uuid;
+
+async fn send_batch_messages(n: usize, user_id: String) {
+    let mut first_id:Option<String> = None;
+    for i in 0..n {
+        let id = Uuid::new_v4().to_string();
+        if first_id.is_none() {
+            first_id = Some(id.clone());
+        }
+    let msg = RequestMessage::Put { user_id: "beaa3a60-0082-4e5d-8153-a3c062dfdd2a".to_string(), id: "0e58d858-0808-4cef-8143-8eb4db188a64".to_string(), parent: None, data: Bytes::from("{\"title\": \"abc\"}") };
+
+    }
+}
 
 async fn client_test(mut conn: Connection) {
     let mut ctr: usize = 0;
