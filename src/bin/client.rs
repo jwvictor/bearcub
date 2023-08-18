@@ -42,7 +42,7 @@ async fn client_test(mut conn: Connection) {
     let mut ctr: usize = 0;
 
 
-    send_batch_messages(40, "beaa3a60-0082-4e5d-8153-a3c062dfdd2a".to_string(), &mut conn).await;
+    send_batch_messages(1000, "beaa3a60-0082-4e5d-8153-a3c062dfdd2a".to_string(), &mut conn).await;
 
     // Write the intitial message
     let msg = RequestMessage::Put { user_id: "beaa3a60-0082-4e5d-8153-a3c062dfdd2a".to_string(), id: "0e58d858-0808-4cef-8143-8eb4db188a64".to_string(), parent: None, data: Bytes::from("{\"title\": \"abc\"}") };
