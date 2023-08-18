@@ -1,8 +1,6 @@
 use anyhow::anyhow;
 use bytes::{BytesMut, Bytes, BufMut, Buf};
 use anyhow::*;
-use crate::server::connection::Frameable;
-
 use super::wire::Frame;
 
 #[derive(Debug)]
@@ -53,8 +51,18 @@ pub const ERR_DESC_INVALID_MSG: &'static str = "invalid message";
 pub const ERR_CODE_NO_SUCH_ENTITY: u32 = 12;
 pub const ERR_DESC_NO_SUCH_ENTITY: &'static str = "no such entity";
 
-impl Frameable for ResponseMessage {
-    fn to_frames(mut self) -> Vec<Frame> {
+impl ResponseMessage {
+
+    fn from_frames_data(frames: Vec<Frame>) -> Bytes {
+        let mut out = BytesMut::with_capacity(BUF_CAP*frames.len());
+        for f in frames {
+            let bs = f.data.to_vec();
+            out.put_slice(&bs[..]);
+        }
+        out.freeze()
+    }
+
+    pub fn to_frames(mut self) -> Vec<Frame> {
         match &mut self {
             ResponseMessage::Error{code, description} => {
                 let mut buf = BytesMut::with_capacity(4 + description.len());
@@ -86,7 +94,7 @@ impl Frameable for ResponseMessage {
         }
     }
     
-    fn from_frames(frames: Vec<Frame>) -> Result<ResponseMessage> {
+    pub fn from_frames(frames: Vec<Frame>) -> Result<ResponseMessage> {
         let mut f0 = frames[0].clone();
         match f0.msg_type_flag {
             b'd' => {
@@ -103,19 +111,6 @@ impl Frameable for ResponseMessage {
         }
     }
 
-
-}
-
-impl ResponseMessage {
-
-    fn from_frames_data(frames: Vec<Frame>) -> Bytes {
-        let mut out = BytesMut::with_capacity(BUF_CAP*frames.len());
-        for f in frames {
-            let bs = f.data.to_vec();
-            out.put_slice(&bs[..]);
-        }
-        out.freeze()
-    }
 
     
 }

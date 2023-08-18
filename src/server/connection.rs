@@ -15,11 +15,6 @@ pub struct Connection {
     cxn_start_time: SystemTime,
 }
 
-pub trait Frameable {
-    fn to_frames(self) -> Vec<Frame>; 
-    fn from_frames(_: Vec<Frame>) -> Result<Self>;
-}
-
 pub enum BearcubMessage {
     Request {
         msg: RequestMessage,
@@ -211,14 +206,6 @@ impl Connection {
             println!("error writing frame: {:?}", n.unwrap_err());
             Err(anyhow!("stream write err"))
         }
-    }
-
-    pub async fn write_msg<T>(&mut self, msg: T) -> Result<()> where T: Frameable {
-        let frames = msg.to_frames();
-        for f in &frames {
-            let z = self.write_frame(f).await;
-        }
-        Ok(())
     }
 }
 
