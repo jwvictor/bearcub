@@ -24,6 +24,36 @@ pub enum BearcubMessage {
     },
 }
 
+impl BearcubMessage {
+    pub fn to_frames(self) -> Vec<Frame> {
+        match self {
+            BearcubMessage::Request { msg } => msg.to_frames(),
+            BearcubMessage::Response { msg } => msg.to_frames(),
+        }
+    }
+}
+
+pub async fn read_one_message_frames(connection: &mut Connection) -> Result<Vec<Frame>> {
+    let mut frame_buf:Vec<Frame> = vec![];
+
+    loop {
+        if let Some(frame_opt) = connection.read_frame().await.ok() {
+            if frame_opt.is_some() {
+                let frame = frame_opt.clone().unwrap();
+                frame_buf.push(frame);
+
+                let f = frame_opt.unwrap(); // our copy
+                let rem_frames = f.n_remaining_frames as usize;
+                if rem_frames == 1 {
+                    return Ok(frame_buf);
+                }
+            } else {
+                return Err(anyhow!("broken cxn"));
+            }
+        }
+    }
+}
+
 pub async fn listen<F>(mut connection: Connection, is_client_side: bool, mut callback: F) where
 F: FnMut(BearcubMessage) -> Option<BearcubMessage> {
     // The `Connection` lets us read/write redis **frames** instead of
@@ -206,6 +236,14 @@ impl Connection {
             println!("error writing frame: {:?}", n.unwrap_err());
             Err(anyhow!("stream write err"))
         }
+    }
+
+    pub async fn write_message(&mut self, msg: BearcubMessage) -> Result<()> {
+        let fs = msg.to_frames();
+        for f in &fs {
+            self.write_frame(f).await?;
+        }
+        Ok(())
     }
 }
 
