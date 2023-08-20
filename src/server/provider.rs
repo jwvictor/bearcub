@@ -228,7 +228,7 @@ impl Provider {
                 if x.is_ok() {
                     Ok(ResponseMessage::Data { data: Bytes::from("SUCCESS") })
                 } else {
-                    Ok(ResponseMessage::Error { code: ERR_CODE_INVALID_MSG, description: ERR_DESC_INVALID_MSG.to_string() })
+                    Ok(ResponseMessage::Error { code: ERR_CODE_NO_SUCH_ENTITY, description: ERR_DESC_NO_SUCH_ENTITY.to_string() })
                 }
             },
             RequestMessage::Set { user_id: _, id, data } => {

@@ -4,8 +4,6 @@ use rand::Rng;
 use tokio::net::TcpStream;
 use uuid::Uuid;
 
-// TODO - this thing was returning SUCCESS even when the parent ID didn't exist .. and it even
-// saved the json blob to disk
 async fn send_batch_messages(n: usize, user_id: String, conn: &mut Connection) {
     let mut first_id:Option<String> = None;
     for _i in 0..n {
@@ -42,7 +40,7 @@ async fn client_test(mut conn: Connection) {
     let mut ctr: usize = 0;
 
 
-    send_batch_messages(1000, "beaa3a60-0082-4e5d-8153-a3c062dfdd2a".to_string(), &mut conn).await;
+    send_batch_messages(10, "beaa3a60-0082-4e5d-8153-a3c062dfdd2a".to_string(), &mut conn).await;
 
     // Write the intitial message
     let msg = RequestMessage::Put { user_id: "beaa3a60-0082-4e5d-8153-a3c062dfdd2a".to_string(), id: "0e58d858-0808-4cef-8143-8eb4db188a64".to_string(), parent: None, data: Bytes::from("{\"title\": \"abc\"}") };
@@ -61,9 +59,15 @@ async fn client_test(mut conn: Connection) {
         match x {
             connection::BearcubMessage::Response { msg } => {
                 println!("Got msg from server: {:?}", &msg);
-                if ctr > 5 {
+                if ctr > 6 {
                     // Hang up
                     None 
+                } else if ctr == 6 { 
+                    println!("\t DOING BAD PUT");
+                    let s1 = "{\"title\": \"";
+                    let s2 = "\"}";
+                    let dne = "4444d858-0808-4cef-8143-8eb455555555".to_string();
+                    Some(connection::BearcubMessage::Request { msg: RequestMessage::Put { user_id: "beaa3a60-0082-4e5d-8153-a3c062dfdd2a".to_string(), id: "0e58d858-0808-4cef-8143-8eb4db188333".to_string(), parent: Some(dne), data: Bytes::from(format!("{}{}{}", s1, "timbo", s2)) }}) 
                 } else if ctr == 5 { 
                     println!("\t DOING LIST");
                     Some(connection::BearcubMessage::Request { msg: RequestMessage::List { user_id: "beaa3a60-0082-4e5d-8153-a3c062dfdd2a".to_string(), blob_id: None }}) 
