@@ -101,9 +101,11 @@ impl SkeletonHandle {
                 let parent_node = borrow.nodes.get_mut(pid);
                 if parent_node.is_some() {
                     parent_node.unwrap().add_child(&node.id[..]);
+                    borrow.nodes.insert(node.id.clone(), node);
+                    Ok(())
+                } else {
+                    Err(anyhow!("no such parent node"))
                 }
-                borrow.nodes.insert(node.id.clone(), node);
-                Ok(())
             },
             None => {
                 let selfb = self;
