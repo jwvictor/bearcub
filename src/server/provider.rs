@@ -130,6 +130,26 @@ impl Provider {
         }
     }
 
+    pub fn query_blobs(&self, start_at: Option<String>, query_str: String) -> Result<Bytes> {
+        match &self.skeleton {
+            Some(root) => {
+                let z = match start_at {
+                    Some(bid) => {
+                        let x = root.query(Some(&bid[..]), &query_str);
+                        if x.is_err() {
+                            Err(anyhow!("could not get listing"))
+                        } else {
+                            Ok(x.unwrap())
+                        }
+                    },
+                    None => root.query(None, &query_str),
+                };
+                z
+            },
+            None => Err(anyhow!("state not init'd")),
+        }
+    }
+
     pub fn get_skeleton(&self, blob_id: Option<String>) -> Result<Bytes> {
         match &self.skeleton {
             Some(root) => {
@@ -240,6 +260,10 @@ impl Provider {
                     Result::Ok(s) => Ok(ResponseMessage::Data { data: s }),
                     _ => Err(anyhow!("could not get listing")),
                 }
+            },
+            RequestMessage::Query { user_id: _, blob_id, query_str } => {
+                let dat = self.query_blobs(blob_id, query_str)?;
+                Ok(ResponseMessage::Data { data: dat })
             },
             _ => Ok(ResponseMessage::Error { code: ERR_CODE_INVALID_MSG, description: ERR_DESC_INVALID_MSG.to_string() }),
         }

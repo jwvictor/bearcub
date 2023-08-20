@@ -25,6 +25,11 @@ pub struct SkeletonNode {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SkeletonNodeList {
+    nodes: Vec<SkeletonNode>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SkeletonHandle {
     root: SkeletonNode,
     nodes: HashMap<String,SkeletonNode>,
@@ -55,6 +60,24 @@ impl SkeletonHandle {
     pub fn set_node(&mut self, node: SkeletonNode) -> Result<()> {
         let _ = self.nodes.insert(node.id.clone(), node);
         Ok(())
+    }
+
+    pub fn query_blobs(&self, start_at: Option<&str>, query: &str) ->  Result<Vec<SkeletonNode>> {
+        let get_res = match start_at {
+            Some(sa) => self.get(sa),
+            None => Some(self.root.clone()),
+        };
+        if get_res.is_none() {
+            return Err(anyhow!("no such node"));
+        }
+        let blob = get_res.unwrap();
+        let include_me = blob.matches_query_string(query);
+        let mut results = if include_me { vec![blob.clone()] } else { vec![] };
+        for cid in blob.child_ids {
+            let cns = self.query_blobs(Some(&cid[..]), query).unwrap_or(vec![]);
+            results.extend(cns);
+        }
+        Ok(results)
     }
 
     pub fn to_listing_json(&self, start_at: Option<&str>) ->  Result<serde_json::Value> {
@@ -169,6 +192,19 @@ impl SkeletonHandleRef {
         self.ptr.lock().unwrap().borrow().top_level_ids()
     }
 
+    pub fn query(&self, id: Option<&str>, query: &str) -> Result<Bytes> {
+        let guard = self.ptr.lock().unwrap();
+        let rig = guard.borrow().query_blobs(id, query);
+        match rig {
+            Result::Ok(x) => {
+                let gs = serde_json::json!({"blobs": x });
+                let y = serde_json::to_string(&gs).unwrap_or(String::new());
+                Ok(Bytes::from(y))
+            },
+            _ => Err(anyhow!("query failed")),
+        }
+    }
+
     pub fn get(&self, id: &str) -> Option<SkeletonNode> {
         self.ptr.lock().unwrap().borrow().get(id)
     }
@@ -212,6 +248,11 @@ impl SkeletonNode {
     pub fn new(id: &str, title: &str) -> SkeletonNode {
         SkeletonNode { id: id.to_string(), title: title.to_string(), child_ids: vec![] }
     }
+
+    fn matches_query_string(&self, query: &str) -> bool {
+        self.title.contains(query)
+    }
+
     pub fn has_child(&self, id: &str) -> bool {
         for f in &self.child_ids {
             if f.eq(id) {
