@@ -249,6 +249,7 @@ impl SkeletonNode {
         SkeletonNode { id: id.to_string(), title: title.to_string(), child_ids: vec![] }
     }
 
+    // TODO - make a better match function
     fn matches_query_string(&self, query: &str) -> bool {
         self.title.contains(query)
     }
@@ -300,6 +301,10 @@ mod tests {
         let h2_tlis = h2.top_level_ids();
         assert_eq!(h2_tlis.len(), 1);
         assert_eq!(h2_tlis[0], "n1");
+
+        let q1 = h2.query(None, "nod");
+        assert!(q1.is_ok());
+        // TODO - validate the results as well (I did this by hand the first time)
     }
 }
 
