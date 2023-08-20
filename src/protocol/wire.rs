@@ -56,7 +56,7 @@ impl Frame {
 }
 
 pub fn is_user_id_required_msgtype(msg_type_flag:u8) -> bool {
-    let user_id_req:Vec<u8> = vec!['G', 'L', 'P', 'p', 's', 'R'].into_iter().map(|x| x as u8).collect();
+    let user_id_req:Vec<u8> = vec!['G', 'Q', 'L', 'P', 'p', 's', 'R'].into_iter().map(|x| x as u8).collect();
     user_id_req.contains(&msg_type_flag)
 }
 

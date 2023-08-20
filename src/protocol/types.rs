@@ -29,6 +29,11 @@ pub enum RequestMessage {
         user_id: String,
         blob_id: Option<String>,
     },
+    Query {
+        user_id: String,
+        blob_id: Option<String>,
+        query_str: String,
+    },
 }
 
 #[derive(Debug)]
@@ -175,6 +180,20 @@ impl RequestMessage {
     fn from_frames_put(frames: Vec<Frame>) -> Result<RequestMessage> {
         Self::from_frames_put_set(frames, false)
     }
+    fn from_frames_query(frames: Vec<Frame>) -> Result<RequestMessage> {
+        let mut f = frames[0].clone();
+        let bid_bs = f.data.split_to(36);
+        let bid_opt = if bid_bs.iter().map(|x| *x as u8 == 0).reduce(|x,y| x && y).unwrap_or(true) {
+            None
+        } else {
+            String::from_utf8(bid_bs.to_vec()).ok()
+        };
+        if f.user_id.is_none() {
+            return Err(anyhow!("invalid message"));
+        }
+        let query_str = String::from_utf8(f.data.to_vec()).unwrap_or_else(|_| String::new());
+        Ok(RequestMessage::Query { user_id: f.user_id.unwrap(), blob_id: bid_opt, query_str: query_str })
+    }
 
     pub fn from_frames(frames: Vec<Frame>) -> Result<RequestMessage> {
         let f0 = frames[0].clone();
@@ -183,6 +202,7 @@ impl RequestMessage {
             b'P' => RequestMessage::from_frames_getbypath(f0),
             b'p' => RequestMessage::from_frames_put(frames),
             b's' => RequestMessage::from_frames_set(frames),
+            b'Q' => RequestMessage::from_frames_query(frames),
             b'r' => unimplemented!(),
             b'L' => RequestMessage::from_frames_list(frames),
             _ => Err(anyhow!("invalid msg_type_flag")),
@@ -191,6 +211,19 @@ impl RequestMessage {
 
     pub fn to_frames(self) -> Vec<Frame> {
         match self {
+            RequestMessage::Query{user_id, blob_id, query_str} => {
+                let mut bs = BytesMut::with_capacity(36*2);
+                match blob_id {
+                    Some(bid) => bs.put_slice(bid.as_bytes()),
+                    None => {
+                        let v = [0 as u8; 36]; // All zeros
+                        bs.put_slice(&v[..])
+                    }
+                }
+                bs.put_slice(query_str.as_bytes());
+                let f = Frame::new(Some(user_id), 1, 'Q' as u8, bs.freeze());
+                vec![f]
+            },
             RequestMessage::Get{user_id, id, path} => {
                 let mut frames = vec![];
                 if let Some(id) = id {
@@ -235,6 +268,7 @@ impl RequestMessage {
             &RequestMessage::Set { user_id, .. } => user_id.clone(),
             &RequestMessage::Get { user_id, .. } => user_id.clone(),
             &RequestMessage::List { user_id, .. } => user_id.clone(),
+            &RequestMessage::Query { user_id, .. } => user_id.clone(),
             &RequestMessage::Remove { user_id, .. } => user_id.clone(),
         };
         Some(q)
@@ -429,6 +463,31 @@ mod tests {
                 let b2 = blob_id.is_none();
                 println!("bools {} {}", b1, b2);
                 b1 && b2
+            },
+            _ => false,
+        };
+        assert!(b);
+    }
+
+    #[test]
+    fn test_query_frames() {
+        let msg = RequestMessage::Query { user_id: "2ab3da63-e24f-47e2-9b56-f3d19fade0cf".to_string(), blob_id: Some("2ab3da63-e24f-47e2-9b56-f3d19fade0ce".to_string()), query_str: "hello".to_string() };
+        let frames = msg.to_frames();
+        println!("frame 0: {:?}", &frames[0]);
+        let req_msg_res = RequestMessage::from_frames(frames);
+        if req_msg_res.is_err() {
+            println!("error = {:?}", req_msg_res.unwrap_err());
+            panic!("error");
+        }
+        let req_msg = req_msg_res.unwrap();
+        println!("req_msg: {:?}", req_msg);
+        let b = match req_msg {
+            RequestMessage::Query { user_id, blob_id, query_str} => {
+                let b1 = user_id.eq("2ab3da63-e24f-47e2-9b56-f3d19fade0cf");
+                let b2 = blob_id.unwrap().eq("2ab3da63-e24f-47e2-9b56-f3d19fade0ce");
+                let b3 = query_str.eq("hello");
+                println!("bools {} {} {}", b1, b2, b3);
+                b1 && b3 && b2
             },
             _ => false,
         };
